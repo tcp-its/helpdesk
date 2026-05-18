@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tickets — TCP Smart IT Desk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/main.css">
+  <style>
+    .ticket-detail-header { display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap; }
+    .detail-meta { display:flex;flex-wrap:wrap;gap:12px;margin:12px 0; }
+    .detail-meta-item { display:flex;flex-direction:column;gap:2px; }
+    .detail-meta-label { font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted); }
+    .detail-meta-value { font-size:13px; }
+    .chat-input-area { display:flex;gap:8px;margin-top:12px; }
+    .attachment-list { display:flex;flex-wrap:wrap;gap:8px;margin-top:8px; }
+    .attachment-item { padding:4px 10px;background:var(--surface-alt);border-radius:4px;font-size:12px;display:flex;align-items:center;gap:6px; }
+    .similar-ticket { padding:10px;background:var(--surface-alt);border-radius:8px;margin-bottom:8px;cursor:pointer; }
+    .similar-ticket:hover { background:var(--border); }
+    .score-stars { display:flex;gap:4px;font-size:24px;cursor:pointer; }
+    .score-stars span:hover, .score-stars span.active { color:#f5a623; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- Sidebar -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">🖥️</div>
+      <div class="brand-text">TCP Smart IT Desk<small>IT Helpdesk System</small></div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-section">MAIN</div>
+      <a href="dashboard.html" class="nav-item"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></a>
+      <a href="tickets.html"   class="nav-item active"><span class="nav-icon">🎫</span><span class="nav-label">Ticket ทั้งหมด</span></a>
+      <a href="tickets.html?new=1" class="nav-item"><span class="nav-icon">➕</span><span class="nav-label">เปิด Ticket ใหม่</span></a>
+      <div class="nav-section" id="nav-it-section" style="display:none">IT TEAM</div>
+      <a href="analytics.html" class="nav-item" id="nav-analytics" style="display:none"><span class="nav-icon">📈</span><span class="nav-label">Analytics</span></a>
+      <a href="admin.html"     class="nav-item" id="nav-admin"     style="display:none"><span class="nav-icon">⚙️</span><span class="nav-label">Admin</span></a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-info" onclick="if(confirm('ออกจากระบบ?')){clearAuth();location.href='index.html'}">
+        <div class="user-avatar" id="user-avatar">?</div>
+        <div class="user-details">
+          <div class="user-name" id="user-name">—</div>
+          <div class="user-role" id="user-role-label"></div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="main-content">
+    <header class="app-header">
+      <button class="btn-icon" onclick="document.getElementById('sidebar').classList.toggle('collapsed')">☰</button>
+      <div class="header-title" id="header-title">🎫 Ticket ทั้งหมด</div>
+      <div class="header-actions">
+        <button class="btn-icon" onclick="toggleDarkMode()">🌙</button>
+        <button class="btn btn-primary btn-sm" onclick="openNewTicketModal()">➕ เปิด Ticket ใหม่</button>
+      </div>
+    </header>
+
+    <div class="page-content">
+
+      <!-- Filter Bar -->
+      <div class="filter-bar" id="filter-bar">
+        <input type="text" class="form-control search-input" id="search-input" placeholder="🔍 ค้นหา Ticket ID, ชื่อ, ผู้แจ้ง..." oninput="applyFilters()">
+        <select class="form-control" id="filter-status" onchange="applyFilters()">
+          <option value="">ทุกสถานะ</option>
+          <option>New Requests</option>
+          <option>Working on it</option>
+          <option>Done</option>
+          <option>Reopened</option>
+          <option>SLA Risk</option>
+          <option>Over SLA</option>
+        </select>
+        <select class="form-control" id="filter-priority" onchange="applyFilters()">
+          <option value="">ทุกความเร่งด่วน</option>
+          <option>Urgent</option>
+          <option>Normal</option>
+          <option>Low</option>
+        </select>
+        <select class="form-control" id="filter-type" onchange="applyFilters()">
+          <option value="">ทุกประเภท</option>
+          <option>Hardware</option>
+          <option>Software</option>
+          <option>Server/Network</option>
+          <option>Account &amp; Access Management</option>
+          <option>Backup / Recovery</option>
+          <option>Fixed Assets</option>
+          <option>IT Equipment / Consultation</option>
+          <option>MA Renewal</option>
+        </select>
+        <input type="date" class="form-control" id="filter-date-from" onchange="applyFilters()" title="วันที่เริ่มต้น">
+        <input type="date" class="form-control" id="filter-date-to"   onchange="applyFilters()" title="วันที่สิ้นสุด">
+        <button class="btn btn-secondary btn-sm" onclick="clearFilters()">✖ ล้าง</button>
+        <button class="btn btn-secondary btn-sm" onclick="exportToCSV()">⬇ Export</button>
+        <span class="text-muted fs-12" id="filter-count"></span>
+      </div>
+
+      <!-- Tickets Table -->
+      <div class="card">
+        <div class="card-body" style="padding:0">
+          <div class="table-wrapper">
+            <table id="tickets-table">
+              <thead>
+                <tr>
+                  <th>Ticket ID</th>
+                  <th>ชื่อปัญหา</th>
+                  <th>ผู้แจ้ง</th>
+                  <th>ประเภท</th>
+                  <th>สถานะ</th>
+                  <th>ความเร่งด่วน</th>
+                  <th>ผู้รับผิดชอบ</th>
+                  <th>SLA Deadline</th>
+                  <th>วันที่สร้าง</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="tickets-tbody">
+                <tr><td colspan="10" class="text-center" style="padding:40px">
+                  <div class="spinner" style="margin:0 auto 16px"></div>กำลังโหลด...
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── New Ticket Modal ──────────────────────────────────── -->
+<div class="modal-overlay" id="new-ticket-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title">🎫 เปิด Ticket ใหม่</span>
+      <button class="modal-close" onclick="closeModal('new-ticket-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="ai-suggestion-box" class="alert alert-info mb-16 hidden">
+        <span>🤖</span>
+        <div>
+          <div class="fw-600">AI พบวิธีแก้ไขที่คล้ายกัน:</div>
+          <div id="ai-suggestion-text" class="mt-8"></div>
+        </div>
+      </div>
+      <form id="new-ticket-form">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="form-group" style="grid-column:1/-1">
+            <label class="form-label">ชื่อปัญหา (สั้นๆ) <span class="required">*</span></label>
+            <input class="form-control" id="nt-title" placeholder="เช่น คอมพิวเตอร์เปิดไม่ติด" required>
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label class="form-label">รายละเอียดปัญหา <span class="required">*</span></label>
+            <textarea class="form-control" id="nt-description" rows="4" placeholder="อธิบายปัญหาให้ละเอียด เช่น อาการ วันที่เกิด อุปกรณ์ที่ใช้..." required oninput="onDescriptionInput(this.value)"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">ประเภท Ticket <span class="required">*</span></label>
+            <select class="form-control" id="nt-type" required>
+              <option value="">— เลือกประเภท —</option>
+              <option>Hardware</option>
+              <option>Software</option>
+              <option>Server/Network</option>
+              <option>Account &amp; Access Management</option>
+              <option>Backup / Recovery</option>
+              <option>Fixed Assets</option>
+              <option>IT Equipment / Consultation</option>
+              <option>MA Renewal</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">ความเร่งด่วน <span class="required">*</span></label>
+            <select class="form-control" id="nt-priority" onchange="onPriorityChange()" required>
+              <option value="">— เลือก —</option>
+              <option value="Urgent">🔴 Urgent — เร่งด่วน (SLA 8 ชั่วโมง)</option>
+              <option value="Normal">🟡 Normal — ปกติ (กำหนดวันเอง)</option>
+              <option value="Low">🟢 Low — ไม่เร่งด่วน</option>
+            </select>
+          </div>
+          <div class="form-group" id="target-date-group" style="display:none;grid-column:1/-1">
+            <label class="form-label">วันที่ต้องการให้เสร็จ <span class="required">*</span></label>
+            <input type="datetime-local" class="form-control" id="nt-target-date">
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label class="form-label">แนบไฟล์ (ถ้ามี)</label>
+            <input type="file" class="form-control" id="nt-file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx">
+            <div class="text-muted fs-12 mt-8">รองรับ: รูปภาพ, PDF, Word, Excel (ขนาดไม่เกิน 10MB/ไฟล์)</div>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('new-ticket-modal')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="submitNewTicket()" id="submit-btn">🎫 เปิด Ticket</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Ticket Detail Modal ──────────────────────────────── -->
+<div class="modal-overlay" id="ticket-detail-modal">
+  <div class="modal modal-xl">
+    <div class="modal-header">
+      <span class="modal-title" id="detail-modal-title">รายละเอียด Ticket</span>
+      <button class="modal-close" onclick="closeModal('ticket-detail-modal')">×</button>
+    </div>
+    <div class="modal-body" id="ticket-detail-content" style="padding:0">
+      <div style="display:grid;grid-template-columns:1fr 360px;min-height:500px">
+
+        <!-- Left Panel -->
+        <div style="padding:20px;border-right:1px solid var(--border)">
+          <div class="ticket-detail-header">
+            <div style="flex:1">
+              <h3 id="detail-title" style="font-size:18px;margin-bottom:8px"></h3>
+              <div class="detail-meta" id="detail-meta"></div>
+            </div>
+            <div id="detail-actions" style="display:flex;flex-direction:column;gap:8px;min-width:180px"></div>
+          </div>
+
+          <div class="tabs mt-16">
+            <div class="tab active" onclick="switchDetailTab('info',this)">📋 ข้อมูล</div>
+            <div class="tab" onclick="switchDetailTab('chat',this)">💬 Chat Log</div>
+            <div class="tab" onclick="switchDetailTab('audit',this)">📜 ประวัติ</div>
+            <div class="tab" onclick="switchDetailTab('similar',this)">🔍 คล้ายกัน</div>
+          </div>
+
+          <div id="tab-info">
+            <div class="form-group">
+              <div class="form-label text-muted">รายละเอียดปัญหา</div>
+              <div id="detail-description" style="font-size:14px;line-height:1.7;padding:12px;background:var(--surface-alt);border-radius:8px"></div>
+            </div>
+            <div id="resolution-section" style="display:none">
+              <div class="form-group">
+                <div class="form-label text-muted">วิธีแก้ไข</div>
+                <div id="detail-resolution" style="font-size:14px;line-height:1.7;padding:12px;background:#e6f4ea;border-radius:8px;color:#137333"></div>
+              </div>
+            </div>
+            <div id="ai-suggestion-section" style="display:none" class="alert alert-info mb-16">
+              <span>🤖</span>
+              <div>
+                <div class="fw-600 fs-12 mb-4">AI แนะนำ:</div>
+                <div id="detail-ai-suggestion" class="fs-13"></div>
+              </div>
+            </div>
+            <div id="attachments-section" style="display:none">
+              <div class="form-label text-muted">ไฟล์แนบ</div>
+              <div class="attachment-list" id="detail-attachments"></div>
+            </div>
+          </div>
+
+          <div id="tab-chat" style="display:none">
+            <div class="chat-messages" id="detail-chat-log"></div>
+          </div>
+
+          <div id="tab-audit" style="display:none">
+            <div class="timeline" id="detail-audit-log"></div>
+          </div>
+
+          <div id="tab-similar" style="display:none">
+            <div id="detail-similar-list"></div>
+          </div>
+        </div>
+
+        <!-- Right Panel (IT Staff Controls) -->
+        <div style="padding:20px" id="it-panel">
+          <div style="font-size:13px;font-weight:700;margin-bottom:12px">⚙️ จัดการ Ticket</div>
+
+          <!-- Status Update -->
+          <div class="form-group">
+            <label class="form-label">เปลี่ยนสถานะ</label>
+            <select class="form-control" id="detail-status-select">
+              <option>New Requests</option>
+              <option>Working on it</option>
+              <option>Done</option>
+              <option>SLA Risk</option>
+              <option>Over SLA</option>
+            </select>
+          </div>
+
+          <!-- Assign -->
+          <div class="form-group" id="assign-section">
+            <label class="form-label">มอบหมายให้</label>
+            <select class="form-control" id="detail-assign-select">
+              <option value="">— เลือก IT Staff —</option>
+            </select>
+          </div>
+
+          <!-- Resolution -->
+          <div class="form-group">
+            <label class="form-label">วิธีแก้ไข</label>
+            <textarea class="form-control" id="detail-resolution-input" rows="4" placeholder="อธิบายวิธีที่แก้ไขปัญหา..."></textarea>
+          </div>
+
+          <!-- Root Cause -->
+          <div class="form-group">
+            <label class="form-label">Root Cause</label>
+            <textarea class="form-control" id="detail-rootcause-input" rows="2" placeholder="สาเหตุของปัญหา..."></textarea>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button class="btn btn-primary btn-block" onclick="saveTicketUpdate()">💾 บันทึกการอัพเดต</button>
+            <button class="btn btn-success btn-block" onclick="closeTicket()" id="close-ticket-btn">✅ ปิด Ticket</button>
+            <button class="btn btn-secondary btn-block" onclick="reopenTicket()" id="reopen-ticket-btn" style="display:none">🔁 เปิดใหม่</button>
+          </div>
+
+          <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">
+
+          <!-- Satisfaction Score -->
+          <div id="satisfaction-section" style="display:none">
+            <div class="form-label">⭐ ความพึงพอใจ</div>
+            <div class="score-stars" id="score-stars"></div>
+            <div class="mt-8 text-muted fs-12" id="score-display"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+  if (!loadStoredSession()) location.href = 'index.html';
+
+  const urlParams = new URLSearchParams(location.search);
+  let allTickets = [];
+  let currentTicket = null;
+  let selectedScore = 0;
+
+  // Setup nav
+  const user = getCurrentUser();
+  if (user) {
+    document.getElementById('user-name').textContent = user.display_name || user.email;
+    document.getElementById('user-role-label').textContent = user.role;
+    document.getElementById('user-avatar').textContent = (user.display_name||'U')[0];
+    if (isITStaff()) {
+      document.getElementById('nav-it-section').style.display = 'block';
+      document.getElementById('nav-analytics').style.display = 'flex';
+    }
+    if (isManager()) document.getElementById('nav-admin').style.display = 'flex';
+  }
+
+  // Auto-open modal if ?new=1 or ?id=xxx
+  window.addEventListener('load', async () => {
+    await loadTickets();
+    if (urlParams.get('new')) openNewTicketModal();
+    if (urlParams.get('id')) openTicketDetail(urlParams.get('id'));
+  });
+
+  // ── Load Tickets ────────────────────────────────────────────
+  async function loadTickets() {
+    try {
+      const res = await API.get(isITStaff() ? 'tickets' : 'tickets/my');
+      allTickets = res.success ? res.data : [];
+      renderTable(allTickets);
+    } catch(e) {
+      showToast('ไม่สามารถโหลด Ticket ได้', 'error');
+    }
+  }
+
+  // ── Render Table ────────────────────────────────────────────
+  function renderTable(tickets) {
+    document.getElementById('filter-count').textContent = tickets.length + ' รายการ';
+    const tbody = document.getElementById('tickets-tbody');
+    if (!tickets.length) {
+      tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">🎫</div><h3>ไม่พบ Ticket</h3><p>ยังไม่มี Ticket หรือไม่ตรงกับเงื่อนไขที่กรอง</p></div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = tickets.map(t => {
+      const rowClass = t.priority === 'Urgent' ? 'urgent' : t.status === 'Over SLA' ? 'over-sla' : t.status === 'SLA Risk' ? 'sla-risk' : '';
+      const slaText  = t.sla_deadline ? `<span style="color:${new Date(t.sla_deadline)<new Date()?'var(--danger)':'var(--text-secondary)'};font-size:11px">${formatDate(t.sla_deadline)}</span>` : '<span class="text-muted">—</span>';
+      return `<tr class="${rowClass}" onclick="openTicketDetail('${t.ticket_id}')">
+        <td><span style="font-weight:700;color:var(--primary);font-size:12px">${t.ticket_id}</span></td>
+        <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.title||'—'}</td>
+        <td class="fs-12">${t.requester_name||'—'}</td>
+        <td class="fs-12">${t.ticket_type||'—'}</td>
+        <td>${statusBadge(t.status)}</td>
+        <td>${priorityBadge(t.priority)}</td>
+        <td class="fs-12">${t.assigned_name||'<span class="text-muted">—</span>'}</td>
+        <td>${slaText}</td>
+        <td class="fs-12 text-muted">${timeAgo(t.created_at)}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openTicketDetail('${t.ticket_id}')">รายละเอียด</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── Filters ─────────────────────────────────────────────────
+  function applyFilters() {
+    const kw   = document.getElementById('search-input').value.toLowerCase();
+    const st   = document.getElementById('filter-status').value;
+    const pr   = document.getElementById('filter-priority').value;
+    const ty   = document.getElementById('filter-type').value;
+    const df   = document.getElementById('filter-date-from').value;
+    const dt   = document.getElementById('filter-date-to').value;
+    let result = allTickets.filter(t => {
+      if (kw && !JSON.stringify(t).toLowerCase().includes(kw)) return false;
+      if (st && t.status !== st) return false;
+      if (pr && t.priority !== pr) return false;
+      if (ty && t.ticket_type !== ty) return false;
+      if (df && new Date(t.created_at) < new Date(df)) return false;
+      if (dt && new Date(t.created_at) > new Date(dt + 'T23:59')) return false;
+      return true;
+    });
+    renderTable(result);
+  }
+
+  function clearFilters() {
+    ['search-input','filter-status','filter-priority','filter-type','filter-date-from','filter-date-to']
+      .forEach(id => document.getElementById(id).value = '');
+    renderTable(allTickets);
+  }
+
+  function exportToCSV() {
+    const rows = [['Ticket ID','Title','Requester','Type','Status','Priority','Assignee','SLA Deadline','Created']];
+    allTickets.forEach(t => rows.push([t.ticket_id,t.title,t.requester_name,t.ticket_type,t.status,t.priority,t.assigned_name,t.sla_deadline,t.created_at]));
+    const csv = rows.map(r => r.map(c => '"'+(c||'').toString().replace(/"/g,'""')+'"').join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,﻿' + encodeURIComponent(csv);
+    a.download = 'tickets_' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click();
+  }
+
+  // ── New Ticket Modal ─────────────────────────────────────────
+  function openNewTicketModal() { openModal('new-ticket-modal'); }
+
+  function onPriorityChange() {
+    const p = document.getElementById('nt-priority').value;
+    document.getElementById('target-date-group').style.display = p === 'Normal' ? 'block' : 'none';
+  }
+
+  let descTimeout;
+  function onDescriptionInput(val) {
+    clearTimeout(descTimeout);
+    if (val.length < 20) return;
+    descTimeout = setTimeout(async () => {
+      try {
+        const res = await API.post('ai/chat', { message: 'หาวิธีแก้ปัญหาจาก IT knowledge base สั้นๆ: ' + val, history: [] });
+        if (res.success && res.data.response) {
+          document.getElementById('ai-suggestion-text').textContent = res.data.response;
+          document.getElementById('ai-suggestion-box').classList.remove('hidden');
+        }
+      } catch(e) {}
+    }, 1500);
+  }
+
+  async function submitNewTicket() {
+    const title = document.getElementById('nt-title').value.trim();
+    const desc  = document.getElementById('nt-description').value.trim();
+    const type  = document.getElementById('nt-type').value;
+    const prio  = document.getElementById('nt-priority').value;
+    const tdate = document.getElementById('nt-target-date').value;
+
+    if (!title || !desc || !type || !prio) { showToast('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน', 'warning'); return; }
+    if (prio === 'Normal' && !tdate) { showToast('กรุณาระบุวันที่ต้องการให้เสร็จ', 'warning'); return; }
+
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ กำลังสร้าง...';
+
+    try {
+      const res = await API.post('ticket/create', { title, description: desc, ticket_type: type, priority: prio, target_date: tdate });
+      if (res.success) {
+        showToast(`✅ เปิด Ticket สำเร็จ! ID: ${res.data.ticket_id}`, 'success', 5000);
+        closeModal('new-ticket-modal');
+        document.getElementById('new-ticket-form').reset();
+        await loadTickets();
+        openTicketDetail(res.data.ticket_id);
+      } else {
+        showToast('เกิดข้อผิดพลาด: ' + (res.data?.error || 'กรุณาลองใหม่'), 'error');
+      }
+    } catch(e) {
+      showToast('ไม่สามารถสร้าง Ticket ได้', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🎫 เปิด Ticket';
+    }
+  }
+
+  // ── Ticket Detail ────────────────────────────────────────────
+  async function openTicketDetail(ticketId) {
+    openModal('ticket-detail-modal');
+    document.getElementById('ticket-detail-content').innerHTML = '<div style="padding:60px;text-align:center"><div class="spinner" style="margin:0 auto 16px"></div><p>กำลังโหลด...</p></div>';
+
+    try {
+      const [tRes, staffRes] = await Promise.all([
+        API.get('ticket', { id: ticketId }),
+        API.get('users/it')
+      ]);
+      if (!tRes.success) { showToast('ไม่พบ Ticket', 'error'); closeModal('ticket-detail-modal'); return; }
+      currentTicket = tRes.data;
+      renderTicketDetail(currentTicket, staffRes.data || []);
+    } catch(e) {
+      showToast('เกิดข้อผิดพลาด', 'error');
+    }
+  }
+
+  function renderTicketDetail(t, staff) {
+    document.getElementById('detail-modal-title').textContent = t.ticket_id;
+    document.getElementById('detail-title').textContent = t.title;
+
+    // Meta
+    document.getElementById('detail-meta').innerHTML = `
+      ${statusBadge(t.status)} ${priorityBadge(t.priority)}
+      <div class="detail-meta-item"><div class="detail-meta-label">ประเภท</div><div class="detail-meta-value">${t.ticket_type}</div></div>
+      <div class="detail-meta-item"><div class="detail-meta-label">KPI</div><div class="detail-meta-value">${t.kpi_category}</div></div>
+      <div class="detail-meta-item"><div class="detail-meta-label">ผู้แจ้ง</div><div class="detail-meta-value">${t.requester_name}</div></div>
+      <div class="detail-meta-item"><div class="detail-meta-label">สร้างเมื่อ</div><div class="detail-meta-value">${formatDate(t.created_at)}</div></div>
+      ${t.sla_deadline ? `<div class="detail-meta-item"><div class="detail-meta-label">SLA Deadline</div><div class="detail-meta-value" style="color:${new Date(t.sla_deadline)<new Date()?'var(--danger)':'var(--warning)'}">${formatDate(t.sla_deadline)}</div></div>` : ''}
+      ${t.assigned_name ? `<div class="detail-meta-item"><div class="detail-meta-label">ผู้รับผิดชอบ</div><div class="detail-meta-value">${t.assigned_name}</div></div>` : ''}
+    `;
+
+    // Description
+    document.getElementById('detail-description').textContent = t.description;
+
+    // Resolution
+    if (t.resolution) {
+      document.getElementById('resolution-section').style.display = 'block';
+      document.getElementById('detail-resolution').textContent = t.resolution;
+    }
+
+    // AI suggestion
+    if (t.ai_suggested_solution) {
+      document.getElementById('ai-suggestion-section').style.display = 'block';
+      document.getElementById('detail-ai-suggestion').textContent = t.ai_suggested_solution;
+    }
+
+    // Attachments
+    const urls = typeof t.attachment_urls === 'string' ? JSON.parse(t.attachment_urls||'[]') : (t.attachment_urls||[]);
+    if (urls.length) {
+      document.getElementById('attachments-section').style.display = 'block';
+      document.getElementById('detail-attachments').innerHTML = urls.map((u,i) =>
+        `<a href="${u}" target="_blank" class="attachment-item">📎 ไฟล์แนบ ${i+1}</a>`
+      ).join('');
+    }
+
+    // IT Panel
+    const itPanel = document.getElementById('it-panel');
+    if (isITStaff()) {
+      itPanel.style.display = 'block';
+      const statusSel = document.getElementById('detail-status-select');
+      statusSel.value = t.status;
+
+      const assignSel = document.getElementById('detail-assign-select');
+      assignSel.innerHTML = '<option value="">— เลือก IT Staff —</option>' +
+        staff.filter(s => s.role !== 'IT_MANAGER' || isManager()).map(s =>
+          `<option value="${s.email}" ${s.email===t.assigned_to?'selected':''}>${s.display_name}</option>`
+        ).join('');
+
+      document.getElementById('detail-resolution-input').value = t.resolution || '';
+      document.getElementById('detail-rootcause-input').value  = t.root_cause || '';
+
+      // Show/hide close & reopen buttons
+      if (t.status === 'Done') {
+        document.getElementById('close-ticket-btn').style.display   = 'none';
+        document.getElementById('reopen-ticket-btn').style.display  = 'flex';
+      } else {
+        document.getElementById('close-ticket-btn').style.display   = 'flex';
+        document.getElementById('reopen-ticket-btn').style.display  = 'none';
+      }
+
+      // Satisfaction
+      if (t.satisfaction_score > 0) {
+        document.getElementById('satisfaction-section').style.display = 'block';
+        document.getElementById('score-display').textContent = '⭐'.repeat(t.satisfaction_score) + ' (' + t.satisfaction_score + '/5)';
+      }
+    } else {
+      itPanel.style.display = 'none';
+      // Show user actions (reopen if Done within window)
+      if (t.status === 'Done' && t.requester_email === getCurrentUser()?.email) {
+        document.getElementById('detail-actions').innerHTML =
+          `<button class="btn btn-secondary btn-sm" onclick="reopenTicket()">🔁 เปิดใหม่</button>`;
+        if (!t.satisfaction_score) {
+          document.getElementById('detail-actions').innerHTML +=
+            `<button class="btn btn-warning btn-sm" onclick="showScoreModal('${t.ticket_id}')">⭐ ให้คะแนน</button>`;
+        }
+      }
+    }
+  }
+
+  // Tab switching
+  function switchDetailTab(tab, el) {
+    ['info','chat','audit','similar'].forEach(t => document.getElementById('tab-'+t).style.display = 'none');
+    document.getElementById('tab-'+tab).style.display = 'block';
+    document.querySelectorAll('#ticket-detail-modal .tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+
+    if (tab === 'chat' && currentTicket) loadChatLog(currentTicket.ticket_id);
+    if (tab === 'audit' && currentTicket) loadAuditLog(currentTicket.ticket_id);
+    if (tab === 'similar' && currentTicket) loadSimilar(currentTicket);
+  }
+
+  async function loadChatLog(ticketId) {
+    const res = await API.get('chatlog', { ticket_id: ticketId });
+    const logs = res.success ? res.data : [];
+    const container = document.getElementById('detail-chat-log');
+    if (!logs.length) { container.innerHTML = '<div class="empty-state"><p>ยังไม่มี Chat Log</p></div>'; return; }
+    container.innerHTML = logs.map(l => `
+      <div class="chat-msg ${l.message_type === 'USER' ? 'user' : l.message_type === 'SYSTEM' ? 'system' : 'ai'}">
+        <div>
+          <div class="chat-bubble">${l.message}</div>
+          <div class="chat-time">${l.message_type} • ${formatDate(l.timestamp)}</div>
+        </div>
+      </div>`).join('');
+    container.scrollTop = container.scrollHeight;
+  }
+
+  async function loadAuditLog(ticketId) {
+    const res = await API.get('audit', { entity_type: 'TICKET', entity_id: ticketId });
+    const logs = res.success ? res.data : [];
+    document.getElementById('detail-audit-log').innerHTML = logs.map(l => `
+      <div class="timeline-item">
+        <div class="timeline-time">${formatDate(l.timestamp)} — ${l.actor_email}</div>
+        <div class="timeline-title">${l.action}</div>
+        ${l.new_value ? `<div class="timeline-body">${l.new_value}</div>` : ''}
+      </div>`).join('') || '<div class="empty-state"><p>ยังไม่มีประวัติ</p></div>';
+  }
+
+  function loadSimilar(ticket) {
+    const similar = typeof ticket.similar_tickets === 'string' ? JSON.parse(ticket.similar_tickets||'[]') : [];
+    const container = document.getElementById('detail-similar-list');
+    if (!similar.length) { container.innerHTML = '<div class="empty-state"><p>ไม่พบ Ticket ที่คล้ายกัน</p></div>'; return; }
+    container.innerHTML = similar.map(id => {
+      const t = allTickets.find(a => a.ticket_id === id);
+      if (!t) return '';
+      return `<div class="similar-ticket" onclick="openTicketDetail('${id}')">
+        <div class="fw-600 fs-12">${id}</div>
+        <div class="fs-13">${t.title}</div>
+        <div class="fs-12 text-muted">${t.resolution ? '✅ ' + t.resolution.substring(0,100) : 'ยังไม่มีวิธีแก้ไข'}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── IT Actions ───────────────────────────────────────────────
+  async function saveTicketUpdate() {
+    const status     = document.getElementById('detail-status-select').value;
+    const assignee   = document.getElementById('detail-assign-select').value;
+    const resolution = document.getElementById('detail-resolution-input').value;
+    const rootcause  = document.getElementById('detail-rootcause-input').value;
+
+    showLoader('กำลังบันทึก...');
+    try {
+      await Promise.all([
+        API.post('ticket/status',  { ticket_id: currentTicket.ticket_id, status }),
+        assignee ? API.post('ticket/assign', { ticket_id: currentTicket.ticket_id, assignee_email: assignee }) : Promise.resolve(),
+        API.post('ticket/update',  { ticket_id: currentTicket.ticket_id, resolution, root_cause: rootcause })
+      ]);
+      showToast('บันทึกสำเร็จ', 'success');
+      await loadTickets();
+      closeModal('ticket-detail-modal');
+    } catch(e) {
+      showToast('เกิดข้อผิดพลาด', 'error');
+    } finally { hideLoader(); }
+  }
+
+  async function closeTicket() {
+    const resolution = document.getElementById('detail-resolution-input').value;
+    if (!resolution.trim()) { showToast('กรุณาระบุวิธีแก้ไขก่อนปิด Ticket', 'warning'); return; }
+    showLoader('กำลังปิด Ticket...');
+    try {
+      const res = await API.post('ticket/close', {
+        ticket_id:  currentTicket.ticket_id,
+        resolution,
+        root_cause: document.getElementById('detail-rootcause-input').value
+      });
+      if (res.success) { showToast('ปิด Ticket สำเร็จ', 'success'); await loadTickets(); closeModal('ticket-detail-modal'); }
+      else showToast(res.data?.error || 'เกิดข้อผิดพลาด', 'error');
+    } catch(e) { showToast('เกิดข้อผิดพลาด', 'error'); }
+    finally { hideLoader(); }
+  }
+
+  async function reopenTicket() {
+    if (!confirm('ต้องการเปิด Ticket นี้ใหม่หรือไม่?')) return;
+    const res = await API.post('ticket/reopen', { ticket_id: currentTicket.ticket_id });
+    if (res.success) { showToast('เปิด Ticket ใหม่แล้ว', 'success'); await loadTickets(); closeModal('ticket-detail-modal'); }
+    else showToast(res.data?.error || 'เกิดข้อผิดพลาด', 'error');
+  }
+</script>
+</body>
+</html>

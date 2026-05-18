@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — TCP Smart IT Desk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/main.css">
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+  <style>
+    .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .dash-grid.full { grid-template-columns: 1fr; }
+    .ai-summary-card { background: linear-gradient(135deg, #1a73e8, #0d47a1); color: #fff; border: none; }
+    .ai-summary-card .card-header { border-color: rgba(255,255,255,.2); }
+    .ai-summary-card .card-title  { color: #fff; }
+    .workload-bar { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .workload-bar:last-child { border: none; }
+    .workload-name { width: 120px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .workload-fill { flex: 1; background: var(--border); height: 8px; border-radius: 4px; overflow: hidden; }
+    .workload-fill-inner { height: 100%; background: var(--primary); border-radius: 4px; transition: width .5s ease; }
+    .workload-count { font-size: 12px; font-weight: 700; min-width: 24px; text-align: right; }
+    .sla-ring { display: flex; align-items: center; justify-content: center; flex-direction: column; }
+    #sla-chart { margin: 0 auto; }
+    .recent-ticket { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+    .recent-ticket:last-child { border: none; }
+    .recent-ticket:hover { opacity: .8; }
+    .ticket-id-badge { font-size: 10px; font-weight: 700; color: var(--primary); background: var(--primary-light); padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+    .trend-positive { color: var(--secondary); }
+    .trend-negative { color: var(--danger); }
+    @media (max-width: 900px) { .dash-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- Sidebar -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">🖥️</div>
+      <div class="brand-text">TCP Smart IT Desk<small>IT Helpdesk System</small></div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-section">MAIN</div>
+      <a href="dashboard.html" class="nav-item active"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></a>
+      <a href="tickets.html"   class="nav-item"><span class="nav-icon">🎫</span><span class="nav-label">Ticket ทั้งหมด</span><span class="nav-badge" id="nav-open-count">0</span></a>
+      <a href="tickets.html?new=1" class="nav-item"><span class="nav-icon">➕</span><span class="nav-label">เปิด Ticket ใหม่</span></a>
+      <div class="nav-section" id="nav-it-section" style="display:none">IT TEAM</div>
+      <a href="analytics.html" class="nav-item" id="nav-analytics" style="display:none"><span class="nav-icon">📈</span><span class="nav-label">Analytics</span></a>
+      <a href="admin.html"     class="nav-item" id="nav-admin"     style="display:none"><span class="nav-icon">⚙️</span><span class="nav-label">Admin</span></a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-info" id="user-info-btn" onclick="showUserMenu()">
+        <div class="user-avatar" id="user-avatar">?</div>
+        <div class="user-details">
+          <div class="user-name" id="user-name">Loading...</div>
+          <div class="user-role" id="user-role-label"></div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <div class="main-content">
+    <header class="app-header">
+      <button class="btn-icon" onclick="toggleSidebar()" title="Toggle Menu">☰</button>
+      <div class="header-title">📊 Dashboard</div>
+      <div class="header-actions">
+        <button class="btn-icon" onclick="toggleDarkMode()" title="Dark Mode">🌙</button>
+        <button class="btn-icon" onclick="toggleLang()" title="Language" id="lang-btn">EN</button>
+        <button class="btn-icon" onclick="refreshDashboard()" title="Refresh" id="refresh-btn">🔄</button>
+        <button class="btn btn-primary btn-sm" onclick="location.href='tickets.html?new=1'">➕ เปิด Ticket</button>
+      </div>
+    </header>
+
+    <div class="page-content">
+
+      <!-- AI Executive Summary -->
+      <div class="card ai-summary-card mb-16" id="ai-summary-card">
+        <div class="card-header">
+          <span style="font-size:20px">🤖</span>
+          <span class="card-title">AI Executive Summary</span>
+          <span style="font-size:11px;opacity:.7" id="summary-time"></span>
+        </div>
+        <div class="card-body">
+          <p id="ai-summary-text" style="line-height:1.7;opacity:.95">กำลังวิเคราะห์ข้อมูล...</p>
+        </div>
+      </div>
+
+      <!-- KPI Cards -->
+      <div class="kpi-grid mb-24" id="kpi-grid">
+        <!-- Populated by JS -->
+      </div>
+
+      <!-- Row 1 -->
+      <div class="dash-grid mb-20">
+
+        <!-- Ticket Trend Chart -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">📈 Ticket 7 วันล่าสุด</span>
+            <span class="text-muted fs-12" id="trend-subtitle"></span>
+          </div>
+          <div class="card-body" style="padding:12px">
+            <div id="trend-chart" style="height:220px"></div>
+          </div>
+        </div>
+
+        <!-- Status Distribution -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">📊 สถานะ Ticket</span></div>
+          <div class="card-body" style="padding:12px">
+            <div id="status-chart" style="height:220px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 2 -->
+      <div class="dash-grid mb-20">
+
+        <!-- SLA Performance -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">⏱️ SLA Performance</span></div>
+          <div class="card-body">
+            <div class="d-flex align-center gap-16 mb-16">
+              <div id="sla-chart" style="height:160px;width:160px"></div>
+              <div style="flex:1">
+                <div class="mb-8">
+                  <div class="fs-13 text-muted">SLA Rate</div>
+                  <div style="font-size:32px;font-weight:800;color:var(--secondary)" id="sla-rate">—%</div>
+                </div>
+                <div id="sla-stats"></div>
+              </div>
+            </div>
+            <div id="sla-risk-list"></div>
+          </div>
+        </div>
+
+        <!-- Team Workload -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">👥 Team Workload</span></div>
+          <div class="card-body" id="workload-container">
+            <div class="empty-state">
+              <div class="spinner spinner-sm"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 3 -->
+      <div class="dash-grid mb-20">
+
+        <!-- Ticket Type Distribution -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">🗂️ ประเภท Ticket</span></div>
+          <div class="card-body" style="padding:12px">
+            <div id="type-chart" style="height:240px"></div>
+          </div>
+        </div>
+
+        <!-- Recent Tickets -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">🕐 Ticket ล่าสุด</span>
+            <a href="tickets.html" class="btn btn-secondary btn-sm">ดูทั้งหมด →</a>
+          </div>
+          <div class="card-body" id="recent-tickets-list">
+            <div class="empty-state"><div class="spinner spinner-sm"></div></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /page-content -->
+  </div><!-- /main-content -->
+</div><!-- /app-layout -->
+
+<script src="assets/js/app.js"></script>
+<script>
+  google.charts.load('current', { packages: ['corechart', 'bar', 'gauge'] });
+  google.charts.setOnLoadCallback(initDashboard);
+
+  // ── Auth Guard ──────────────────────────────────────────────
+  if (!loadStoredSession()) { location.href = 'index.html'; }
+  setupNav();
+
+  function setupNav() {
+    const user = getCurrentUser();
+    if (!user) return;
+    document.getElementById('user-name').textContent  = user.display_name || user.email;
+    document.getElementById('user-role-label').textContent = user.role || '';
+    document.getElementById('user-avatar').textContent = (user.display_name || 'U')[0].toUpperCase();
+    if (user.picture) {
+      document.getElementById('user-avatar').innerHTML = `<img src="${user.picture}" alt="">`;
+    }
+    if (isITStaff()) {
+      document.getElementById('nav-it-section').style.display  = 'block';
+      document.getElementById('nav-analytics').style.display   = 'flex';
+    }
+    if (isManager()) {
+      document.getElementById('nav-admin').style.display = 'flex';
+    }
+  }
+
+  // ── Dashboard Init ──────────────────────────────────────────
+  let dashData = null;
+
+  async function initDashboard() {
+    await loadDashboard();
+  }
+
+  async function loadDashboard() {
+    try {
+      const res = await API.get('dashboard');
+      if (!res.success) { showToast('ไม่สามารถโหลดข้อมูลได้', 'error'); return; }
+      dashData = res.data;
+      renderKPIs(dashData);
+      renderTrendChart(dashData.trend);
+      renderStatusChart(dashData.summary);
+      renderSLAGauge(dashData.sla);
+      renderWorkload(dashData.workload);
+      renderTypeChart(dashData.summary.by_type);
+      renderRecentTickets();
+      renderAISummary(dashData.ai_summary);
+      document.getElementById('summary-time').textContent = new Date().toLocaleTimeString('th-TH');
+    } catch (e) {
+      showToast('เกิดข้อผิดพลาดในการโหลดข้อมูล', 'error');
+      console.error(e);
+    }
+  }
+
+  function refreshDashboard() {
+    const btn = document.getElementById('refresh-btn');
+    btn.textContent = '⏳';
+    loadDashboard().then(() => { btn.textContent = '🔄'; });
+  }
+
+  // ── KPI Cards ───────────────────────────────────────────────
+  function renderKPIs(data) {
+    const s   = data.summary;
+    const sla = data.sla;
+    const cards = [
+      { icon:'🎫', label:'Ticket ทั้งหมด',    value: s.total,             bg:'#e8f0fe', color:'#1a73e8' },
+      { icon:'📥', label:'Ticket ใหม่วันนี้',  value: data.new_today,      bg:'#fce8e6', color:'#ea4335' },
+      { icon:'⚙️', label:'กำลังดำเนินการ',    value: s.working,           bg:'#fff3e0', color:'#f5a623' },
+      { icon:'✅', label:'เสร็จสิ้นวันนี้',    value: data.done_today,     bg:'#e6f4ea', color:'#34a853' },
+      { icon:'⚠️', label:'SLA Risk',           value: s.sla_risk,          bg:'#fff8e1', color:'#ff9800' },
+      { icon:'🚨', label:'เกิน SLA',           value: s.over_sla,          bg:'#fce8e6', color:'#ea4335' },
+      { icon:'⏱️', label:'เวลาแก้ไขเฉลี่ย',  value: data.avg_time_hrs + ' ชม.', bg:'#e8f0fe', color:'#1a73e8' },
+      { icon:'⭐', label:'ความพึงพอใจ',       value: data.avg_satisfaction + '/5', bg:'#fff8e1', color:'#f5a623' }
+    ];
+    document.getElementById('kpi-grid').innerHTML = cards.map(c => `
+      <div class="kpi-card">
+        <div class="kpi-icon" style="background:${c.bg}"><span style="color:${c.color}">${c.icon}</span></div>
+        <div>
+          <div class="kpi-value" style="color:${c.color}">${c.value}</div>
+          <div class="kpi-label">${c.label}</div>
+        </div>
+      </div>`).join('');
+
+    // Nav badge
+    const openCount = (s.new || 0) + (s.working || 0) + (s.sla_risk || 0) + (s.over_sla || 0);
+    document.getElementById('nav-open-count').textContent = openCount;
+  }
+
+  // ── Trend Line Chart ────────────────────────────────────────
+  function renderTrendChart(trend) {
+    if (!trend) return;
+    const data = new google.visualization.DataTable();
+    data.addColumn('string', 'วัน');
+    data.addColumn('number', 'สร้างใหม่');
+    data.addColumn('number', 'เสร็จสิ้น');
+    trend.forEach(r => data.addRow([r.date, r.created, r.closed]));
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    new google.visualization.LineChart(document.getElementById('trend-chart')).draw(data, {
+      colors: ['#1a73e8', '#34a853'],
+      legend: { position: 'bottom', textStyle: { fontSize: 11, color: isDark ? '#aaa' : '#666' } },
+      hAxis:  { textStyle: { fontSize: 10, color: isDark ? '#aaa' : '#666' } },
+      vAxis:  { minValue: 0, gridlines: { color: isDark ? '#333' : '#f0f0f0' }, textStyle: { fontSize: 10, color: isDark ? '#aaa' : '#666' } },
+      chartArea: { left: 40, right: 20, top: 20, bottom: 40 },
+      backgroundColor: 'transparent',
+      lineWidth: 2,
+      pointSize: 4,
+      curveType: 'function'
+    });
+  }
+
+  // ── Status Donut Chart ──────────────────────────────────────
+  function renderStatusChart(summary) {
+    const mapping = {
+      'New Requests': summary.new, 'Working on it': summary.working,
+      'Done': summary.done, 'Reopened': summary.reopened,
+      'SLA Risk': summary.sla_risk, 'Over SLA': summary.over_sla
+    };
+    const data = new google.visualization.DataTable();
+    data.addColumn('string', 'สถานะ');
+    data.addColumn('number', 'จำนวน');
+    Object.entries(mapping).forEach(([k, v]) => { if (v > 0) data.addRow([k, v]); });
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    new google.visualization.PieChart(document.getElementById('status-chart')).draw(data, {
+      colors:    ['#1a73e8','#f5a623','#34a853','#9c27b0','#ff9800','#ea4335'],
+      pieHole:   0.45,
+      legend:    { position: 'right', textStyle: { fontSize: 11, color: isDark ? '#aaa' : '#666' } },
+      chartArea: { left: 10, right: 160, top: 10, bottom: 10 },
+      backgroundColor: 'transparent',
+      pieSliceBorderColor: 'transparent'
+    });
+  }
+
+  // ── SLA Gauge ───────────────────────────────────────────────
+  function renderSLAGauge(sla) {
+    if (!sla) return;
+    document.getElementById('sla-rate').textContent = sla.sla_rate_pct + '%';
+    const data = google.visualization.arrayToDataTable([['Label','Value'],['SLA', sla.sla_rate_pct]]);
+    const color = sla.sla_rate_pct >= 90 ? '#34a853' : sla.sla_rate_pct >= 70 ? '#f5a623' : '#ea4335';
+    new google.visualization.Gauge(document.getElementById('sla-chart')).draw(data, {
+      min: 0, max: 100, yellowFrom: 70, yellowTo: 90,
+      redFrom: 0, redTo: 70, greenFrom: 90, greenTo: 100,
+      animation: { duration: 800 }
+    });
+    document.getElementById('sla-stats').innerHTML = `
+      <div class="d-flex justify-between fs-12 mb-8">
+        <span class="text-secondary">✅ Met</span><span class="fw-600" style="color:#34a853">${sla.sla_met}</span>
+      </div>
+      <div class="d-flex justify-between fs-12 mb-8">
+        <span class="text-secondary">⚠️ At Risk</span><span class="fw-600" style="color:#ff9800">${sla.at_risk}</span>
+      </div>
+      <div class="d-flex justify-between fs-12">
+        <span class="text-secondary">🚨 Breached</span><span class="fw-600" style="color:#ea4335">${sla.sla_breached}</span>
+      </div>`;
+  }
+
+  // ── Workload Bars ───────────────────────────────────────────
+  function renderWorkload(workload) {
+    const container = document.getElementById('workload-container');
+    if (!workload || Object.keys(workload).length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div><p>ยังไม่มีข้อมูล Workload</p></div>';
+      return;
+    }
+    const max = Math.max(...Object.values(workload));
+    container.innerHTML = Object.entries(workload)
+      .sort(([,a],[,b]) => b - a)
+      .map(([name, count]) => `
+        <div class="workload-bar">
+          <div class="workload-name">${name}</div>
+          <div class="workload-fill"><div class="workload-fill-inner" style="width:${max > 0 ? (count/max*100) : 0}%"></div></div>
+          <div class="workload-count">${count}</div>
+        </div>`).join('');
+  }
+
+  // ── Type Bar Chart ──────────────────────────────────────────
+  function renderTypeChart(byType) {
+    if (!byType) return;
+    const data = new google.visualization.DataTable();
+    data.addColumn('string', 'ประเภท');
+    data.addColumn('number', 'จำนวน');
+    Object.entries(byType).forEach(([k,v]) => { if (v > 0) data.addRow([k, v]); });
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    new google.visualization.BarChart(document.getElementById('type-chart')).draw(data, {
+      colors:    ['#1a73e8'],
+      legend:    { position: 'none' },
+      hAxis:     { minValue: 0, textStyle: { fontSize: 10, color: isDark ? '#aaa' : '#666' } },
+      vAxis:     { textStyle: { fontSize: 10, color: isDark ? '#aaa' : '#666' } },
+      chartArea: { left: 160, right: 20, top: 10, bottom: 30 },
+      backgroundColor: 'transparent',
+      bar:       { groupWidth: '65%' }
+    });
+  }
+
+  // ── Recent Tickets ──────────────────────────────────────────
+  async function renderRecentTickets() {
+    try {
+      const res = await API.get('tickets', { limit: 8 });
+      const container = document.getElementById('recent-tickets-list');
+      if (!res.success || !res.data.length) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">🎫</div><p>ยังไม่มี Ticket</p></div>';
+        return;
+      }
+      container.innerHTML = res.data.slice(0, 6).map(t => `
+        <div class="recent-ticket" onclick="location.href='tickets.html?id=${t.ticket_id}'">
+          <div style="flex:1">
+            <div class="d-flex align-center gap-8 mb-4">
+              <span class="ticket-id-badge">${t.ticket_id}</span>
+              ${statusBadge(t.status)}
+              ${priorityBadge(t.priority)}
+            </div>
+            <div class="fs-13 fw-600">${t.title || '—'}</div>
+            <div class="fs-12 text-muted">${t.requester_name} • ${timeAgo(t.created_at)}</div>
+          </div>
+        </div>`).join('');
+    } catch(e) { console.error(e); }
+  }
+
+  // ── AI Summary ──────────────────────────────────────────────
+  function renderAISummary(summary) {
+    document.getElementById('ai-summary-text').textContent = summary || 'ไม่สามารถสร้าง AI Summary ได้ในขณะนี้';
+  }
+
+  // ── Sidebar & Lang ──────────────────────────────────────────
+  function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    if (window.innerWidth < 768) {
+      sidebar.classList.toggle('mobile-open');
+    } else {
+      sidebar.classList.toggle('collapsed');
+    }
+  }
+
+  function toggleLang() {
+    const newLang = currentLang === 'th' ? 'en' : 'th';
+    setLang(newLang);
+    document.getElementById('lang-btn').textContent = newLang === 'th' ? 'EN' : 'TH';
+  }
+
+  function showUserMenu() {
+    if (confirm('ออกจากระบบ?')) {
+      clearAuth();
+      location.href = 'index.html';
+    }
+  }
+
+  // Auto-refresh every 5 minutes
+  setInterval(refreshDashboard, 5 * 60 * 1000);
+</script>
+</body>
+</html>

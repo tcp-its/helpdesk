@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TCP Smart IT Desk — เข้าสู่ระบบ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/main.css">
+  <style>
+    .features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 28px 0; text-align: left; }
+    .feature { display: flex; align-items: flex-start; gap: 10px; padding: 12px; background: rgba(255,255,255,.05); border-radius: 10px; }
+    .feature-icon { font-size: 20px; }
+    .feature-text { font-size: 12px; color: rgba(255,255,255,.7); }
+    .feature-title { font-size: 13px; font-weight: 600; color: #fff; }
+    .divider { border: none; border-top: 1px solid rgba(255,255,255,.1); margin: 20px 0; }
+    .domain-note { font-size: 11px; color: rgba(255,255,255,.4); margin-top: 16px; }
+    .version { font-size: 10px; color: rgba(255,255,255,.25); margin-top: 24px; }
+    #loading-state { display: none; }
+    .dots::after { content: ''; animation: dots 1.5s steps(4,end) infinite; }
+    @keyframes dots { 0%,20%{content:''} 40%{content:'.'} 60%{content:'..'} 80%,100%{content:'...'} }
+  </style>
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-card">
+      <div class="login-logo">🖥️</div>
+      <h1 class="login-title">TCP Smart IT Desk</h1>
+      <p class="login-subtitle">ระบบ IT Helpdesk อัจฉริยะ<br>สำหรับพนักงาน TCP Pharmachem</p>
+
+      <div class="features">
+        <div class="feature">
+          <span class="feature-icon">🤖</span>
+          <div class="feature-text">
+            <div class="feature-title">AI ช่วยตอบปัญหา</div>
+            Gemini AI + FAQ ตอบโจทย์ทันที
+          </div>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">📊</span>
+          <div class="feature-text">
+            <div class="feature-title">Dashboard แบบ Real-time</div>
+            ติดตาม SLA & KPI ได้ตลอดเวลา
+          </div>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">💬</span>
+          <div class="feature-text">
+            <div class="feature-title">LINE OA Chatbot</div>
+            เปิด Ticket ผ่าน LINE ได้เลย
+          </div>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">🔒</span>
+          <div class="feature-text">
+            <div class="feature-title">ปลอดภัย 100%</div>
+            Google Workspace Login เท่านั้น
+          </div>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <!-- Google Sign-In Button -->
+      <div id="sign-in-state">
+        <button class="google-btn" id="google-signin-btn" onclick="signInWithGoogle()">
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
+          เข้าสู่ระบบด้วย Google Workspace
+        </button>
+        <p class="domain-note">🔒 เฉพาะบัญชี @tcpharmachem.com เท่านั้น</p>
+      </div>
+
+      <div id="loading-state">
+        <div style="display:flex;align-items:center;justify-content:center;gap:12px;color:rgba(255,255,255,.7);font-size:14px">
+          <div class="spinner" style="width:24px;height:24px;border-width:3px;border-color:rgba(255,255,255,.3);border-top-color:#fff"></div>
+          <span>กำลังเข้าสู่ระบบ<span class="dots"></span></span>
+        </div>
+      </div>
+
+      <div id="error-state" style="display:none">
+        <div class="alert alert-danger" style="text-align:left">
+          <span>⚠️</span>
+          <span id="error-msg"></span>
+        </div>
+        <button class="google-btn" onclick="signInWithGoogle()">
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
+          ลองใหม่อีกครั้ง
+        </button>
+      </div>
+
+      <p class="version">TCP Smart IT Desk v1.0 • Powered by Gemini AI</p>
+    </div>
+  </div>
+
+  <!-- Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    // Check if already logged in
+    window.addEventListener('load', () => {
+      if (loadStoredSession()) {
+        redirectToDashboard();
+        return;
+      }
+      initGoogleSignIn();
+    });
+
+    function initGoogleSignIn() {
+      // Initialize GIS (Google Identity Services)
+      if (typeof google === 'undefined') {
+        setTimeout(initGoogleSignIn, 300);
+        return;
+      }
+      google.accounts.id.initialize({
+        client_id:         APP_CONFIG.GOOGLE_CLIENT_ID,
+        callback:          handleGoogleResponse,
+        auto_select:       false,
+        cancel_on_tap_outside: true,
+        ux_mode:           'popup'
+      });
+    }
+
+    function signInWithGoogle() {
+      if (typeof google === 'undefined') {
+        showError('ไม่สามารถโหลด Google Sign-In ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต');
+        return;
+      }
+      google.accounts.id.prompt();
+    }
+
+    async function handleGoogleResponse(credentialResponse) {
+      const idToken = credentialResponse.credential;
+      if (!idToken) {
+        showError('ไม่ได้รับข้อมูลจาก Google กรุณาลองใหม่');
+        return;
+      }
+
+      showLoading();
+
+      try {
+        // Verify token and get user from backend
+        const result = await API.get('users/me', { token: idToken });
+
+        if (!result.success) {
+          if (result.status === 401 || result.status === 403) {
+            showError('บัญชีของคุณไม่ได้รับอนุญาต กรุณาใช้บัญชี @tcpharmachem.com เท่านั้น');
+          } else {
+            showError('เกิดข้อผิดพลาด: ' + (result.data?.error || 'กรุณาลองใหม่อีกครั้ง'));
+          }
+          return;
+        }
+
+        const user = result.data;
+        setSession(idToken, user);
+        redirectToDashboard();
+
+      } catch (err) {
+        showError('เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง');
+        console.error(err);
+      }
+    }
+
+    function showLoading() {
+      document.getElementById('sign-in-state').style.display = 'none';
+      document.getElementById('error-state').style.display   = 'none';
+      document.getElementById('loading-state').style.display = 'block';
+    }
+
+    function showError(msg) {
+      document.getElementById('sign-in-state').style.display = 'none';
+      document.getElementById('loading-state').style.display = 'none';
+      document.getElementById('error-state').style.display   = 'block';
+      document.getElementById('error-msg').textContent = msg;
+    }
+
+    function redirectToDashboard() {
+      window.location.href = 'dashboard.html';
+    }
+  </script>
+</body>
+</html>

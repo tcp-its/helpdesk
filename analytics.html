@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analytics — TCP Smart IT Desk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/main.css">
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+  <style>
+    .analytics-tabs { display:flex; gap:0; border-bottom:2px solid var(--border); margin-bottom:24px; overflow-x:auto; }
+    .analytics-tab  { padding:12px 24px; cursor:pointer; font-size:14px; font-weight:600; color:var(--text-secondary);
+                      border-bottom:2px solid transparent; margin-bottom:-2px; white-space:nowrap; transition:all .2s; }
+    .analytics-tab.active { color:var(--primary); border-bottom-color:var(--primary); }
+    .analytics-tab:hover  { color:var(--primary); }
+    .section { display:none; }
+    .section.active { display:block; }
+    .report-card { background:var(--surface); border:1px solid var(--border); border-radius:12px;
+                   padding:20px; margin-bottom:16px; }
+    .report-card h4 { font-size:14px; font-weight:700; margin-bottom:12px; }
+    .kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:20px; }
+    .kpi-mini { background:var(--surface-alt); border-radius:8px; padding:14px; }
+    .kpi-mini-val { font-size:24px; font-weight:800; }
+    .kpi-mini-lbl { font-size:11px; color:var(--text-muted); margin-top:2px; }
+    .ai-insight { background:linear-gradient(135deg,#e8f0fe,#f3f8ff); border:1px solid #c5d9f7;
+                  border-radius:10px; padding:16px; margin-bottom:16px; }
+    [data-theme="dark"] .ai-insight { background:linear-gradient(135deg,#1a2e4a,#162038); border-color:#2a4a7a; }
+    .export-bar { display:flex; gap:10px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- Sidebar -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">🖥️</div>
+      <div class="brand-text">TCP Smart IT Desk<small>IT Helpdesk System</small></div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-section">MAIN</div>
+      <a href="dashboard.html" class="nav-item"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></a>
+      <a href="tickets.html"   class="nav-item"><span class="nav-icon">🎫</span><span class="nav-label">Tickets</span></a>
+      <a href="tickets.html?new=1" class="nav-item"><span class="nav-icon">➕</span><span class="nav-label">เปิด Ticket ใหม่</span></a>
+      <div class="nav-section">IT TEAM</div>
+      <a href="analytics.html" class="nav-item active"><span class="nav-icon">📈</span><span class="nav-label">Analytics</span></a>
+      <a href="admin.html"     class="nav-item" id="nav-admin" style="display:none"><span class="nav-icon">⚙️</span><span class="nav-label">Admin</span></a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-info" onclick="if(confirm('ออกจากระบบ?')){clearAuth();location.href='index.html'}">
+        <div class="user-avatar" id="user-avatar">?</div>
+        <div class="user-details">
+          <div class="user-name"  id="user-name">—</div>
+          <div class="user-role" id="user-role-label"></div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="main-content">
+    <header class="app-header">
+      <button class="btn-icon" onclick="document.getElementById('sidebar').classList.toggle('collapsed')">☰</button>
+      <div class="header-title">📈 Analytics & Reports</div>
+      <div class="header-actions">
+        <button class="btn-icon" onclick="toggleDarkMode()">🌙</button>
+        <button class="btn btn-secondary btn-sm" onclick="sendDailyBrief()">📤 ส่ง Daily Brief</button>
+      </div>
+    </header>
+
+    <div class="page-content">
+
+      <!-- Date Range -->
+      <div class="export-bar">
+        <label class="fs-13 fw-600">ช่วงเวลา:</label>
+        <input type="date" class="form-control" id="date-from" style="width:160px">
+        <span class="text-muted">—</span>
+        <input type="date" class="form-control" id="date-to"   style="width:160px">
+        <button class="btn btn-primary btn-sm"    onclick="loadAnalytics()">🔍 วิเคราะห์</button>
+        <button class="btn btn-secondary btn-sm"  onclick="exportExcel()">📊 Export Excel</button>
+        <button class="btn btn-secondary btn-sm"  onclick="exportPDF()">📄 Export PDF</button>
+      </div>
+
+      <!-- Section Tabs -->
+      <div class="analytics-tabs">
+        <div class="analytics-tab active" onclick="switchSection('overview',this)">📊 ภาพรวม</div>
+        <div class="analytics-tab" onclick="switchSection('sla',this)">⏱️ SLA</div>
+        <div class="analytics-tab" onclick="switchSection('team',this)">👥 ทีม</div>
+        <div class="analytics-tab" onclick="switchSection('ai',this)">🤖 AI Analytics</div>
+        <div class="analytics-tab" onclick="switchSection('executive',this)">👔 Executive Summary</div>
+      </div>
+
+      <!-- ── SECTION: OVERVIEW ──────────────────────────── -->
+      <div id="section-overview" class="section active">
+        <div class="kpi-row" id="overview-kpis"></div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+          <div class="report-card">
+            <h4>📈 แนวโน้ม Ticket รายเดือน</h4>
+            <div id="monthly-trend-chart" style="height:240px"></div>
+          </div>
+          <div class="report-card">
+            <h4>🗂️ สัดส่วนตามประเภท</h4>
+            <div id="type-pie-chart" style="height:240px"></div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+          <div class="report-card">
+            <h4>🎯 KPI Category Distribution</h4>
+            <div id="kpi-chart" style="height:220px"></div>
+          </div>
+          <div class="report-card">
+            <h4>⭐ ความพึงพอใจเฉลี่ย</h4>
+            <div id="satisfaction-chart" style="height:220px"></div>
+            <div class="text-center mt-16">
+              <span style="font-size:40px;font-weight:800;color:var(--warning)" id="avg-satisfaction-big">—</span>
+              <span class="text-muted"> / 5</span>
+              <div class="text-muted fs-12 mt-8" id="satisfaction-count"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── SECTION: SLA ───────────────────────────────── -->
+      <div id="section-sla" class="section">
+        <div class="kpi-row" id="sla-kpis"></div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+          <div class="report-card">
+            <h4>📊 SLA Performance รายเดือน</h4>
+            <div id="sla-trend-chart" style="height:240px"></div>
+          </div>
+          <div class="report-card">
+            <h4>⏱️ เวลาแก้ไขเฉลี่ยตามประเภท</h4>
+            <div id="resolution-time-chart" style="height:240px"></div>
+          </div>
+        </div>
+
+        <div class="report-card">
+          <h4>🚨 Tickets ที่เกิน SLA</h4>
+          <div class="table-wrapper">
+            <table id="sla-breach-table">
+              <thead>
+                <tr>
+                  <th>Ticket ID</th><th>ชื่อปัญหา</th><th>ประเภท</th>
+                  <th>ผู้รับผิดชอบ</th><th>SLA Deadline</th><th>ปิดเมื่อ</th><th>เกินกำหนด</th>
+                </tr>
+              </thead>
+              <tbody id="sla-breach-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── SECTION: TEAM ──────────────────────────────── -->
+      <div id="section-team" class="section">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+          <div class="report-card">
+            <h4>👥 Ticket ตามผู้รับผิดชอบ</h4>
+            <div id="assignee-chart" style="height:260px"></div>
+          </div>
+          <div class="report-card">
+            <h4>📊 ประสิทธิภาพรายคน</h4>
+            <div class="table-wrapper">
+              <table id="team-perf-table">
+                <thead>
+                  <tr><th>IT Staff</th><th>รับมอบหมาย</th><th>เสร็จสิ้น</th><th>SLA Met%</th><th>Avg. เวลา (ชม.)</th><th>คะแนนพึงพอใจ</th></tr>
+                </thead>
+                <tbody id="team-perf-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="report-card">
+          <h4>📅 Ticket ตามวันในสัปดาห์</h4>
+          <div id="weekday-chart" style="height:220px"></div>
+        </div>
+      </div>
+
+      <!-- ── SECTION: AI ANALYTICS ──────────────────────── -->
+      <div id="section-ai" class="section">
+        <div class="kpi-row" id="ai-kpis"></div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+          <div class="report-card">
+            <h4>🤖 AI Resolution Rate</h4>
+            <div id="ai-resolution-chart" style="height:240px"></div>
+          </div>
+          <div class="report-card">
+            <h4>🔑 Top Keywords ที่ถูกถามบ่อย</h4>
+            <div id="keyword-chart" style="height:240px"></div>
+          </div>
+        </div>
+
+        <div class="ai-insight" id="ai-trend-insight">
+          <div style="display:flex;align-items:flex-start;gap:12px">
+            <span style="font-size:24px">🤖</span>
+            <div>
+              <div class="fw-600 mb-8">AI Trend Analysis</div>
+              <p id="ai-trend-text" style="font-size:13px;line-height:1.7">กำลังวิเคราะห์...</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="report-card">
+          <h4>📚 Knowledge Base Performance</h4>
+          <div class="table-wrapper">
+            <table>
+              <thead><tr><th>KB ID</th><th>ปัญหา</th><th>ประเภท</th><th>ถูกใช้งาน</th><th>ประสิทธิภาพ</th></tr></thead>
+              <tbody id="kb-table-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── SECTION: EXECUTIVE SUMMARY ────────────────── -->
+      <div id="section-executive" class="section">
+        <div class="ai-insight mb-20">
+          <div style="display:flex;align-items:flex-start;gap:12px">
+            <span style="font-size:28px">👔</span>
+            <div style="flex:1">
+              <div class="fw-600 fs-16 mb-8">AI Executive Summary</div>
+              <p id="exec-summary-text" style="font-size:14px;line-height:1.8">กำลังสร้าง Executive Summary...</p>
+              <div class="text-muted fs-11 mt-8" id="exec-summary-time"></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-bottom:20px">
+          <div class="report-card">
+            <h4>🎯 KPI Achievement</h4>
+            <div id="kpi-achievement-list"></div>
+          </div>
+          <div class="report-card">
+            <h4>🏆 Top Performers</h4>
+            <div id="top-performers-list"></div>
+          </div>
+          <div class="report-card">
+            <h4>💡 AI Recommendations</h4>
+            <div id="ai-recommendations" style="font-size:13px;line-height:1.7"></div>
+          </div>
+        </div>
+
+        <div class="report-card">
+          <h4>📊 Monthly Comparison</h4>
+          <div id="monthly-comparison-chart" style="height:260px"></div>
+        </div>
+      </div>
+
+    </div><!-- /page-content -->
+  </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+  // ── Auth Guard ──────────────────────────────────────────────
+  if (!loadStoredSession()) { location.href = 'index.html'; }
+  const user = getCurrentUser();
+  if (!isITStaff()) { location.href = 'dashboard.html'; }
+
+  if (user) {
+    document.getElementById('user-name').textContent = user.display_name || user.email;
+    document.getElementById('user-role-label').textContent = user.role;
+    document.getElementById('user-avatar').textContent = (user.display_name||'U')[0];
+    if (isManager()) document.getElementById('nav-admin').style.display = 'flex';
+  }
+
+  google.charts.load('current', { packages: ['corechart','bar','gauge','table'] });
+  google.charts.setOnLoadCallback(() => {
+    setDefaultDates();
+    loadAnalytics();
+  });
+
+  // ── Date Range ──────────────────────────────────────────────
+  function setDefaultDates() {
+    const now  = new Date();
+    const from = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    document.getElementById('date-from').value = from.toISOString().slice(0,10);
+    document.getElementById('date-to').value   = now.toISOString().slice(0,10);
+  }
+
+  // ── Load All Analytics ──────────────────────────────────────
+  let analyticsData = null;
+  let allTickets    = [];
+
+  async function loadAnalytics() {
+    showLoader('กำลังวิเคราะห์ข้อมูล...');
+    try {
+      const [aRes, tRes, kbRes] = await Promise.all([
+        API.get('analytics'),
+        API.get('tickets'),
+        API.get('kb')
+      ]);
+      analyticsData = aRes.success ? aRes.data : {};
+      allTickets    = tRes.success  ? tRes.data  : [];
+
+      const df = document.getElementById('date-from').value;
+      const dt = document.getElementById('date-to').value;
+      const filtered = allTickets.filter(t => {
+        const d = new Date(t.created_at);
+        return (!df || d >= new Date(df)) && (!dt || d <= new Date(dt + 'T23:59'));
+      });
+
+      renderOverview(filtered, analyticsData);
+      renderSLASection(filtered);
+      renderTeamSection(filtered);
+      renderAISection(analyticsData, kbRes.data || []);
+      renderExecutiveSection(filtered, analyticsData);
+    } catch(e) {
+      showToast('ไม่สามารถโหลดข้อมูล Analytics ได้', 'error');
+      console.error(e);
+    } finally { hideLoader(); }
+  }
+
+  // ── Section Switcher ────────────────────────────────────────
+  function switchSection(name, el) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.analytics-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('section-' + name).classList.add('active');
+    el.classList.add('active');
+  }
+
+  // ── OVERVIEW ────────────────────────────────────────────────
+  function renderOverview(tickets, data) {
+    const done    = tickets.filter(t => t.status === 'Done');
+    const scored  = tickets.filter(t => t.satisfaction_score > 0);
+    const avgSat  = scored.length ? (scored.reduce((s,t)=>s+parseInt(t.satisfaction_score),0)/scored.length).toFixed(1) : '—';
+    const avgTime = done.filter(t=>t.sla_actual_hours>0).length
+      ? (done.filter(t=>t.sla_actual_hours>0).reduce((s,t)=>s+parseFloat(t.sla_actual_hours),0)/done.filter(t=>t.sla_actual_hours>0).length).toFixed(1)
+      : '—';
+
+    document.getElementById('overview-kpis').innerHTML = [
+      { icon:'🎫', label:'Ticket ทั้งหมด',   val: tickets.length,  color:'#1a73e8' },
+      { icon:'✅', label:'เสร็จสิ้น',         val: done.length,     color:'#34a853' },
+      { icon:'⏱️', label:'เวลาแก้ไขเฉลี่ย', val: avgTime+' ชม.',  color:'#f5a623' },
+      { icon:'⭐', label:'ความพึงพอใจ',       val: avgSat+'/5',     color:'#ff9800' },
+    ].map(k=>`<div class="kpi-mini"><div class="kpi-mini-val" style="color:${k.color}">${k.val}</div><div class="kpi-mini-lbl">${k.icon} ${k.label}</div></div>`).join('');
+
+    // Monthly Trend
+    const byMonth = {};
+    tickets.forEach(t => {
+      const m = t.created_at ? t.created_at.slice(0,7) : 'Unknown';
+      if (!byMonth[m]) byMonth[m] = { created:0, closed:0 };
+      byMonth[m].created++;
+      if (t.closed_at) byMonth[t.closed_at.slice(0,7)] = byMonth[t.closed_at.slice(0,7)] || { created:0, closed:0 };
+      if (t.closed_at) byMonth[t.closed_at.slice(0,7)].closed++;
+    });
+    const months = Object.keys(byMonth).sort().slice(-12);
+    const mdData = new google.visualization.DataTable();
+    mdData.addColumn('string','เดือน'); mdData.addColumn('number','สร้างใหม่'); mdData.addColumn('number','เสร็จสิ้น');
+    months.forEach(m => mdData.addRow([m, byMonth[m]?.created||0, byMonth[m]?.closed||0]));
+    const isDark = document.documentElement.getAttribute('data-theme')==='dark';
+    const chartOpts = { colors:['#1a73e8','#34a853'], legend:{position:'bottom',textStyle:{fontSize:11,color:isDark?'#aaa':'#666'}},
+      hAxis:{textStyle:{fontSize:10,color:isDark?'#aaa':'#666'}}, vAxis:{minValue:0,gridlines:{color:isDark?'#333':'#f0f0f0'},textStyle:{fontSize:10,color:isDark?'#aaa':'#666'}},
+      chartArea:{left:40,right:20,top:10,bottom:40}, backgroundColor:'transparent', lineWidth:2, pointSize:4, curveType:'function' };
+    new google.visualization.LineChart(document.getElementById('monthly-trend-chart')).draw(mdData, chartOpts);
+
+    // Type Pie
+    const byType = {};
+    tickets.forEach(t => { byType[t.ticket_type] = (byType[t.ticket_type]||0)+1; });
+    const tpData = new google.visualization.DataTable();
+    tpData.addColumn('string','ประเภท'); tpData.addColumn('number','จำนวน');
+    Object.entries(byType).filter(([,v])=>v>0).forEach(([k,v])=>tpData.addRow([k,v]));
+    new google.visualization.PieChart(document.getElementById('type-pie-chart')).draw(tpData, {
+      colors:['#1a73e8','#34a853','#ea4335','#f5a623','#9c27b0','#ff9800','#00bcd4','#795548'],
+      pieHole:0.4, legend:{position:'right',textStyle:{fontSize:10,color:isDark?'#aaa':'#666'}},
+      chartArea:{left:10,right:160,top:10,bottom:10}, backgroundColor:'transparent', pieSliceBorderColor:'transparent'
+    });
+
+    // KPI Bar
+    const byKPI = {};
+    tickets.forEach(t => { byKPI[t.kpi_category||'Other'] = (byKPI[t.kpi_category||'Other']||0)+1; });
+    const kpData = new google.visualization.DataTable();
+    kpData.addColumn('string','KPI'); kpData.addColumn('number','จำนวน');
+    Object.entries(byKPI).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>kpData.addRow([k,v]));
+    new google.visualization.BarChart(document.getElementById('kpi-chart')).draw(kpData, {
+      colors:['#1a73e8'], legend:{position:'none'}, backgroundColor:'transparent',
+      hAxis:{minValue:0,textStyle:{fontSize:10,color:isDark?'#aaa':'#666'}},
+      vAxis:{textStyle:{fontSize:10,color:isDark?'#aaa':'#666'}},
+      chartArea:{left:180,right:20,top:10,bottom:30}, bar:{groupWidth:'65%'}
+    });
+
+    // Satisfaction gauge
+    document.getElementById('avg-satisfaction-big').textContent = avgSat;
+    document.getElementById('satisfaction-count').textContent = scored.length + ' รีวิว';
+    if (scored.length) {
+      const satDist = [1,2,3,4,5].map(s=>({ score:s, count: scored.filter(t=>parseInt(t.satisfaction_score)===s).length }));
+      const satData = new google.visualization.DataTable();
+      satData.addColumn('string','คะแนน'); satData.addColumn('number','จำนวน');
+      satDist.forEach(d=>satData.addRow(['⭐'.repeat(d.score),d.count]));
+      new google.visualization.BarChart(document.getElementById('satisfaction-chart')).draw(satData, {
+        colors:['#f5a623'], legend:{position:'none'}, backgroundColor:'transparent',
+        hAxis:{minValue:0,textStyle:{fontSize:10,color:isDark?'#aaa':'#666'}},
+        vAxis:{textStyle:{fontSize:11,color:isDark?'#aaa':'#666'}},
+        chartArea:{left:80,right:20,top:10,bottom:30}, bar:{groupWidth:'60%'}
+      });
+    }
+  }
+
+  // ── SLA SECTION ──────────────────────────────────────────────
+  function renderSLASection(tickets) {
+    const slaData = analyticsData.sla || {};
+    document.getElementById('sla-kpis').innerHTML = [
+      { icon:'✅', label:'SLA Met',     val: slaData.sla_met||0,       color:'#34a853' },
+      { icon:'🚨', label:'SLA Breached',val: slaData.sla_breached||0,  color:'#ea4335' },
+      { icon:'📊', label:'SLA Rate',    val: (slaData.sla_rate_pct||0)+'%', color:'#1a73e8' },
+      { icon:'⚠️', label:'At Risk',     val: slaData.at_risk||0,       color:'#ff9800' },
+    ].map(k=>`<div class="kpi-mini"><div class="kpi-mini-val" style="color:${k.color}">${k.val}</div><div class="kpi-mini-lbl">${k.icon} ${k.label}</div></div>`).join('');
+
+    const isDark = document.documentElement.getAttribute('data-theme')==='dark';
+    // SLA monthly bar
+    const byMonthSLA = {};
+    tickets.filter(t=>t.closed_at).forEach(t=>{
+      const m = t.closed_at.slice(0,7);
+      if (!byMonthSLA[m]) byMonthSLA[m] = {met:0,breached:0};
+      if (t.sla_status==='Met') byMonthSLA[m].met++;
+      else if (t.sla_status==='Breached') byMonthSLA[m].breached++;
+    });
+    const slaTrendData = new google.visualization.DataTable();
+    slaTrendData.addColumn('string','เดือน'); slaTrendData.addColumn('number','Met'); slaTrendData.addColumn('number','Breached');
+    Object.keys(byMonthSLA).sort().slice(-6).forEach(m=>slaTrendData.addRow([m,byMonthSLA[m].met,byMonthSLA[m].breached]));
+    new google.visualization.ColumnChart(document.getElementById('sla-trend-chart')).draw(slaTrendData,{
+      colors:['#34a853','#ea4335'], legend:{position:'bottom',textStyle:{fontSize:11,color:isDark?'#aaa':'#666'}},
+      isStacked:false, backgroundColor:'transparent',
+      hAxis:{textStyle:{fontSize:10,color:isDark?'#aaa':'#666'}}, vAxis:{minValue:0,textStyle:{fontSize:10,color:isDark?'#aaa':'#666'}},
+      chartArea:{left:40,right:20,top:10,bottom:40}, bar:{groupWidth:'60%'}
+    });
+
+    // Resolution time by type
+    const byType = {};
+    tickets.filter(t=>t.sla_actual_hours>0).forEach(t=>{
+      if (!byType[t.ticket_type]) byType[t.ticket_type] = [];
+      byType[t.ticket_type].push(parseFloat(t.sla_actual_hours));
+    });
+    const rtData = new google.visualization.DataTable();
+    rtData.addColumn('string','ประเภท'); rtData.addColumn('number','เฉลี่ย (ชม.)');
+    Object.entries(byType).map(([k,v])=>[k, parseFloat((v.reduce((a,b)=>a+b,0)/v.length).toFixed(1))])
+      .sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>rtData.addRow([k,v]));
+    new google.visualization.BarChart(document.getElementById('resolution-time-chart')).draw(rtData,{
+      colors:['#f5a623'], legend:{position:'none'}, backgroundColor:'transparent',
+      hAxis:{minValue:0,textStyle:{fontSize:10,color:isDark?'#aaa':'#666'}},
+      vAxis:{textStyle:{fontSize:10,color:isDark?'#aaa':'#666'}},
+      chartArea:{left:170,right:20,top:10,bottom:30}
+    });
+
+    // SLA Breach table
+    const breached = tickets.filter(t=>t.sla_status==='Breached');
+    document.getElementById('sla-breach-tbody').innerHTML = breached.length
+      ? breached.map(t=>{
+          const breach = t.sla_deadline && t.closed_at
+            ? Math.round((new Date(t.closed_at)-new Date(t.sla_deadline))/3600000*10)/10 : '—';
+          return `<tr>
+            <td><span style="color:var(--primary);font-weight:700;font-size:12px">${t.ticket_id}</span></td>
+            <td>${t.title||'—'}</td><td class="fs-12">${t.ticket_type}</td>
+            <td class="fs-12">${t.assigned_name||'—'}</td>
+            <td class="fs-12" style="color:var(--danger)">${formatDate(t.sla_deadline)}</td>
+            <td class="fs-12">${formatDate(t.closed_at)}</td>
+            <td class="fs-12" style="color:var(--danger)">${breach} ชม.</td>
+          </tr>`;
+        }).join('')
+      : '<tr><td colspan="7" class="text-center text-muted" style="padding:24px">ไม่มี Ticket ที่เกิน SLA ✅</td></tr>';
+  }
+
+  // ── TEAM SECTION ─────────────────────────────────────────────
+  async function renderTeamSection(tickets) {
+    const isDark = document.documentElement.getAttribute('data-theme')==='dark';
+    const byAssignee = {};
+    tickets.forEach(t => {
+      const name = t.assigned_name || 'Unassigned';
+      if (!byAssignee[name]) byAssignee[name] = { total:0, done:0, met:0, breached:0, times:[], scores:[] };
+      byAssignee[name].total++;
+      if (t.status==='Done') byAssignee[name].done++;
+      if (t.sla_status==='Met') byAssignee[name].met++;
+      if (t.sla_status==='Breached') byAssignee[name].breached++;
+      if (t.sla_actual_hours>0) byAssignee[name].times.push(parseFloat(t.sla_actual_hours));
+      if (t.satisfaction_score>0) byAssignee[name].scores.push(parseInt(t.satisfaction_score));
+    });
+
+    // Assignee bar chart
+    const aData = new google.visualization.DataTable();
+    aData.addColumn('string','Staff'); aData.addColumn('number','เสร็จสิ้น'); aData.addColumn('number','ค้างอยู่');
+    Object.entries(byAssignee).sort((a,b)=>b[1].total-a[1].total).forEach(([name,d])=>{
+      aData.addRow([name, d.done, d.total-d.done]);
+    });
+    new google.visualization.BarChart(document.getElementById('assignee-chart')).draw(aData,{
+      colors:['#34a853','#ea4335'], isStacked:true, legend:{position:'bottom',textStyle:{fontSize:11,color:isDark?'#aaa':'#666'}},
+      backgroundColor:'transparent',
+      hAxis:{minValue:0,textStyle:{fontSize:10,color:isDark?'#aaa':'#666'}},
+      vAxis:{textStyle:{fontSize:11,color:isDark?'#aaa':'#666'}},
+      chartArea:{left:120,right:20,top:10,bottom:40}
+    });
+
+    // Team performance table
+    document.getElementById('team-perf-tbody').innerHTML = Object.entries(byAssignee)
+      .sort((a,b)=>b[1].total-a[1].total)
+      .map(([name,d])=>{
+        const slaRate = (d.met+d.breached)>0 ? Math.round(d.met/(d.met+d.breached)*100) : 100;
+        const avgTime = d.times.length ? (d.times.reduce((a,b)=>a+b,0)/d.times.length).toFixed(1) : '—';
+        const avgSat  = d.scores.length ? (d.scores.reduce((a,b)=>a+b,0)/d.scores.length).toFixed(1) : '—';
+        const slaColor = slaRate>=90?'#34a853':slaRate>=70?'#f5a623':'#ea4335';
+        return `<tr>
+          <td class="fw-600">${name}</td>
+          <td>${d.total}</td><td>${d.done}</td>
+          <td style="color:${slaColor};font-weight:700">${slaRate}%</td>
+          <td>${avgTime}</td>
+          <td>${avgSat==='—'?avgSat:'⭐ '+avgSat}</td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="6" class="text-center text-muted" style="padding:24px">ยังไม่มีข้อมูล</td></tr>';
+
+    // Weekday distribution
+    const byDay = {0:0,1:0,2:0,3:0,4:0,5:0,6:0};
+    tickets.forEach(t => { if (t.created_at) byDay[new Date(t.created_at).getDay()]++; });
+    const dayNames = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
+    const wdData = new google.visualization.DataTable();
+    wdData.addColumn('string','วัน'); wdData.addColumn('number','Ticket');
+    Object.entries(byDay).forEach(([d,c])=>wdData.addRow([dayNames[d],c]));
+    new google.visualization.ColumnChart(document.getElementById('weekday-chart')).draw(wdData,{
+      colors:['#1a73e8'], legend:{position:'none'}, backgroundColor:'transparent',
+      hAxis:{textStyle:{fontSize:11,color:isDark?'#aaa':'#666'}}, vAxis:{minValue:0,textStyle:{fontSize:10,color:isDark?'#aaa':'#666'}},
+      chartArea:{left:40,right:20,top:10,bottom:40}, bar:{groupWidth:'60%'}
+    });
+  }
+
+  // ── AI SECTION ───────────────────────────────────────────────
+  function renderAISection(data, kbItems) {
+    const aiRows = data.ai_analytics || [];
+    const totals = aiRows.reduce((acc,r)=>{
+      acc.queries   += parseInt(r.total_ai_queries||0);
+      acc.faq       += parseInt(r.faq_resolved||0);
+      acc.gemini    += parseInt(r.gemini_resolved||0);
+      acc.escalated += parseInt(r.escalated_to_ticket||0);
+      return acc;
+    },{ queries:0, faq:0, gemini:0, escalated:0 });
+
+    document.getElementById('ai-kpis').innerHTML = [
+      { icon:'💬', label:'AI Queries ทั้งหมด', val: totals.queries, color:'#1a73e8' },
+      { icon:'📖', label:'FAQ แก้ไขได้',        val: totals.faq,     color:'#34a853' },
+      { icon:'🤖', label:'Gemini ตอบ',          val: totals.gemini,  color:'#9c27b0' },
+      { icon:'🎫', label:'Escalate Ticket',     val: totals.escalated, color:'#f5a623' },
+    ].map(k=>`<div class="kpi-mini"><div class="kpi-mini-val" style="color:${k.color}">${k.val}</div><div class="kpi-mini-lbl">${k.icon} ${k.label}</div></div>`).join('');
+
+    const isDark = document.documentElement.getAttribute('data-theme')==='dark';
+    // AI Resolution donut
+    const arData = new google.visualization.DataTable();
+    arData.addColumn('string','ช่องทาง'); arData.addColumn('number','จำนวน');
+    if (totals.faq)      arData.addRow(['FAQ', totals.faq]);
+    if (totals.gemini)   arData.addRow(['Gemini AI', totals.gemini]);
+    if (totals.escalated)arData.addRow(['Escalated', totals.escalated]);
+    if (totals.faq+totals.gemini+totals.escalated > 0) {
+      new google.visualization.PieChart(document.getElementById('ai-resolution-chart')).draw(arData,{
+        colors:['#34a853','#1a73e8','#f5a623'], pieHole:0.4, backgroundColor:'transparent',
+        legend:{position:'right',textStyle:{fontSize:11,color:isDark?'#aaa':'#666'}},
+        chartArea:{left:10,right:160,top:10,bottom:10}, pieSliceBorderColor:'transparent'
+      });
+    }
+
+    // Keyword chart
+    const kws = {};
+    aiRows.forEach(r=>{
+      const topKw = typeof r.top_keywords==='string' ? JSON.parse(r.top_keywords||'{}') : (r.top_keywords||{});
+      Object.entries(topKw).forEach(([k,v])=>{ kws[k]=(kws[k]||0)+(parseInt(v)||1); });
+    });
+    const kwData = new google.visualization.DataTable();
+    kwData.addColumn('string','Keyword'); kwData.addColumn('number','ความถี่');
+    Object.entries(kws).sort((a,b)=>b[1]-a[1]).slice(0,10).forEach(([k,v])=>kwData.addRow([k,v]));
+    if (Object.keys(kws).length>0) {
+      new google.visualization.BarChart(document.getElementById('keyword-chart')).draw(kwData,{
+        colors:['#9c27b0'], legend:{position:'none'}, backgroundColor:'transparent',
+        hAxis:{minValue:0,textStyle:{fontSize:10,color:isDark?'#aaa':'#666'}},
+        vAxis:{textStyle:{fontSize:10,color:isDark?'#aaa':'#666'}},
+        chartArea:{left:100,right:20,top:10,bottom:30}
+      });
+    }
+
+    // KB table
+    document.getElementById('kb-table-tbody').innerHTML = kbItems.slice(0,10).map(kb=>`
+      <tr>
+        <td class="fs-12" style="color:var(--primary)">${kb.kb_id?.slice(0,8)||'—'}</td>
+        <td class="fs-12">${(kb.problem_th||'').slice(0,60)}</td>
+        <td class="fs-12">${kb.ticket_type||'—'}</td>
+        <td>${kb.usage_count||0}</td>
+        <td>${kb.effectiveness_score>0?'⭐ '+(kb.effectiveness_score):'—'}</td>
+      </tr>`).join('') || '<tr><td colspan="5" class="text-center text-muted" style="padding:24px">ยังไม่มีข้อมูล Knowledge Base</td></tr>';
+
+    // AI Trend text
+    const byTypeCount = {};
+    (analyticsData.by_type||{}) && Object.entries(analyticsData.by_type||{}).forEach(([k,v])=>{ if(v>0) byTypeCount[k]=v; });
+    API.post('ai/chat',{
+      message: 'วิเคราะห์แนวโน้ม IT Helpdesk สั้นๆ 2-3 ประโยค จากข้อมูล: FAQ resolved='+totals.faq+', Gemini='+totals.gemini+', escalated='+totals.escalated+', ticket types='+JSON.stringify(byTypeCount),
+      history:[]
+    }).then(r=>{ if(r.success) document.getElementById('ai-trend-text').textContent = r.data.response; });
+  }
+
+  // ── EXECUTIVE SECTION ────────────────────────────────────────
+  async function renderExecutiveSection(tickets, data) {
+    const isDark = document.documentElement.getAttribute('data-theme')==='dark';
+    const sla    = data.sla || {};
+    const scored = tickets.filter(t=>t.satisfaction_score>0);
+    const avgSat = scored.length ? (scored.reduce((s,t)=>s+parseInt(t.satisfaction_score),0)/scored.length).toFixed(1) : '—';
+
+    // KPI Achievement
+    const kpiCategories = {};
+    tickets.forEach(t=>{
+      const kpi = t.kpi_category||'Other';
+      if (!kpiCategories[kpi]) kpiCategories[kpi] = { total:0, done:0 };
+      kpiCategories[kpi].total++;
+      if (t.status==='Done') kpiCategories[kpi].done++;
+    });
+    document.getElementById('kpi-achievement-list').innerHTML = Object.entries(kpiCategories)
+      .map(([kpi,d])=>{
+        const pct = d.total>0 ? Math.round(d.done/d.total*100) : 0;
+        const color = pct>=80?'#34a853':pct>=60?'#f5a623':'#ea4335';
+        return `<div class="mb-16">
+          <div class="d-flex justify-between fs-12 mb-4">
+            <span class="fw-600">${kpi}</span>
+            <span style="color:${color};font-weight:700">${pct}%</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${color}"></div></div>
+          <div class="text-muted fs-11 mt-4">${d.done}/${d.total} tickets resolved</div>
+        </div>`;
+      }).join('') || '<div class="text-muted fs-13">ยังไม่มีข้อมูล</div>';
+
+    // Top Performers
+    const byAssignee = {};
+    tickets.filter(t=>t.assigned_name).forEach(t=>{
+      if (!byAssignee[t.assigned_name]) byAssignee[t.assigned_name] = { done:0, scores:[] };
+      if (t.status==='Done') byAssignee[t.assigned_name].done++;
+      if (t.satisfaction_score>0) byAssignee[t.assigned_name].scores.push(parseInt(t.satisfaction_score));
+    });
+    document.getElementById('top-performers-list').innerHTML = Object.entries(byAssignee)
+      .map(([name,d])=>({ name, done:d.done, avg: d.scores.length?(d.scores.reduce((a,b)=>a+b,0)/d.scores.length).toFixed(1):0 }))
+      .sort((a,b)=>b.done-a.done).slice(0,5)
+      .map((p,i)=>`<div class="d-flex justify-between align-center mb-12">
+        <div class="d-flex align-center gap-8">
+          <span style="font-size:18px">${['🥇','🥈','🥉','4️⃣','5️⃣'][i]}</span>
+          <span class="fw-600 fs-13">${p.name}</span>
+        </div>
+        <div class="text-right">
+          <div class="fs-12 fw-600" style="color:var(--secondary)">${p.done} tickets</div>
+          <div class="text-muted fs-11">${p.avg>0?'⭐ '+p.avg:'—'}</div>
+        </div>
+      </div>`).join('') || '<div class="text-muted fs-13">ยังไม่มีข้อมูล</div>';
+
+    // Monthly comparison bar
+    const byMonth = {};
+    tickets.forEach(t=>{
+      const m = t.created_at?t.created_at.slice(0,7):'Unknown';
+      if(!byMonth[m]) byMonth[m]={created:0,done:0};
+      byMonth[m].created++;
+      if(t.status==='Done') byMonth[m].done++;
+    });
+    const mcData = new google.visualization.DataTable();
+    mcData.addColumn('string','เดือน'); mcData.addColumn('number','สร้างใหม่'); mcData.addColumn('number','เสร็จสิ้น');
+    Object.keys(byMonth).sort().slice(-6).forEach(m=>mcData.addRow([m,byMonth[m].created,byMonth[m].done]));
+    new google.visualization.ColumnChart(document.getElementById('monthly-comparison-chart')).draw(mcData,{
+      colors:['#1a73e8','#34a853'], legend:{position:'bottom',textStyle:{fontSize:11,color:isDark?'#aaa':'#666'}},
+      isStacked:false, backgroundColor:'transparent',
+      hAxis:{textStyle:{fontSize:11,color:isDark?'#aaa':'#666'}}, vAxis:{minValue:0,textStyle:{fontSize:10,color:isDark?'#aaa':'#666'}},
+      chartArea:{left:40,right:20,top:10,bottom:40}, bar:{groupWidth:'65%'}
+    });
+
+    // AI Executive Summary & Recommendations
+    const statsForAI = {
+      total: tickets.length, done: tickets.filter(t=>t.status==='Done').length,
+      sla_rate: sla.sla_rate_pct||0, avg_satisfaction: avgSat,
+      over_sla: sla.sla_breached||0, at_risk: sla.at_risk||0
+    };
+    try {
+      const res = await API.post('ai/chat',{
+        message:'สรุป Executive Summary IT Helpdesk ภาษาไทย 4-5 ประโยค จากข้อมูล: '+JSON.stringify(statsForAI),
+        history:[]
+      });
+      if(res.success) {
+        document.getElementById('exec-summary-text').textContent = res.data.response;
+        document.getElementById('exec-summary-time').textContent = 'สร้างเมื่อ ' + new Date().toLocaleTimeString('th-TH');
+      }
+      const recRes = await API.post('ai/chat',{
+        message:'ให้คำแนะนำ 3 ข้อเพื่อปรับปรุงการดำเนินงาน IT Helpdesk จากข้อมูล: '+JSON.stringify(statsForAI)+' ตอบเป็น bullet points ภาษาไทย',
+        history:[]
+      });
+      if(recRes.success) document.getElementById('ai-recommendations').textContent = recRes.data.response;
+    } catch(e) { console.error(e); }
+  }
+
+  // ── Export Functions ─────────────────────────────────────────
+  function exportExcel() {
+    const rows = [['Ticket ID','Title','Requester','Type','KPI','Status','Priority','Assignee','SLA Deadline','Closed At','SLA Status','Resolution Time (hrs)','Satisfaction']];
+    allTickets.forEach(t=>rows.push([t.ticket_id,t.title,t.requester_name,t.ticket_type,t.kpi_category,t.status,t.priority,t.assigned_name,t.sla_deadline,t.closed_at,t.sla_status,t.sla_actual_hours,t.satisfaction_score]));
+    const csv = rows.map(r=>r.map(c=>'"'+(c||'').toString().replace(/"/g,'""')+'"').join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,﻿'+encodeURIComponent(csv);
+    a.download = 'tcp_it_analytics_'+new Date().toISOString().slice(0,10)+'.csv';
+    a.click();
+  }
+
+  function exportPDF() { window.print(); }
+
+  async function sendDailyBrief() {
+    if (!confirm('ส่ง Daily Brief ไปยัง IT Team ทาง LINE และ Email?')) return;
+    showLoader('กำลังส่ง...');
+    try {
+      const res = await API.post('report/daily', {});
+      if (res.success) showToast('ส่ง Daily Brief สำเร็จ', 'success');
+      else showToast('เกิดข้อผิดพลาด', 'error');
+    } catch(e) { showToast('ไม่สามารถส่งได้', 'error'); }
+    finally { hideLoader(); }
+  }
+</script>
+</body>
+</html>

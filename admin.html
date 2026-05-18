@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — TCP Smart IT Desk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/main.css">
+  <style>
+    .admin-tabs  { display:flex; gap:0; border-bottom:2px solid var(--border); margin-bottom:24px; overflow-x:auto; }
+    .admin-tab   { padding:12px 24px; cursor:pointer; font-size:14px; font-weight:600; color:var(--text-secondary);
+                   border-bottom:2px solid transparent; margin-bottom:-2px; white-space:nowrap; transition:all .2s; }
+    .admin-tab.active { color:var(--primary); border-bottom-color:var(--primary); }
+    .section     { display:none; }
+    .section.active { display:block; }
+    .config-row  { display:grid; grid-template-columns:220px 1fr auto; gap:12px; align-items:center;
+                   padding:12px; border-bottom:1px solid var(--border); }
+    .config-row:last-child { border:none; }
+    .config-key  { font-size:13px; font-weight:600; }
+    .config-desc { font-size:11px; color:var(--text-muted); margin-top:2px; }
+    .role-badge  { padding:3px 10px; border-radius:10px; font-size:11px; font-weight:700; }
+    .role-USER      { background:#e8f0fe; color:#1a73e8; }
+    .role-IT_STAFF  { background:#e6f4ea; color:#137333; }
+    .role-IT_MANAGER{ background:#fce8e6; color:#c62828; }
+    .kb-card    { border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:10px; }
+    .kb-pending { border-left:4px solid var(--warning); }
+    .kb-approved{ border-left:4px solid var(--secondary); opacity:.7; }
+    .holiday-row{ display:grid; grid-template-columns:1fr 2fr 1fr auto; gap:12px; align-items:center;
+                  padding:10px; border-bottom:1px solid var(--border); }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- Sidebar -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">🖥️</div>
+      <div class="brand-text">TCP Smart IT Desk<small>IT Helpdesk System</small></div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-section">MAIN</div>
+      <a href="dashboard.html" class="nav-item"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></a>
+      <a href="tickets.html"   class="nav-item"><span class="nav-icon">🎫</span><span class="nav-label">Tickets</span></a>
+      <a href="tickets.html?new=1" class="nav-item"><span class="nav-icon">➕</span><span class="nav-label">เปิด Ticket ใหม่</span></a>
+      <div class="nav-section">IT TEAM</div>
+      <a href="analytics.html" class="nav-item"><span class="nav-icon">📈</span><span class="nav-label">Analytics</span></a>
+      <a href="admin.html"     class="nav-item active"><span class="nav-icon">⚙️</span><span class="nav-label">Admin</span></a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-info" onclick="if(confirm('ออกจากระบบ?')){clearAuth();location.href='index.html'}">
+        <div class="user-avatar" id="user-avatar">?</div>
+        <div class="user-details">
+          <div class="user-name"  id="user-name">—</div>
+          <div class="user-role" id="user-role-label"></div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="main-content">
+    <header class="app-header">
+      <button class="btn-icon" onclick="document.getElementById('sidebar').classList.toggle('collapsed')">☰</button>
+      <div class="header-title">⚙️ Admin Panel</div>
+      <div class="header-actions">
+        <button class="btn-icon" onclick="toggleDarkMode()">🌙</button>
+      </div>
+    </header>
+
+    <div class="page-content">
+
+      <div class="admin-tabs">
+        <div class="admin-tab active" onclick="switchTab('users',this)">👥 Users & Roles</div>
+        <div class="admin-tab" onclick="switchTab('faq',this)">📖 FAQ Knowledge</div>
+        <div class="admin-tab" onclick="switchTab('ai-kb',this)">🤖 AI Knowledge Base</div>
+        <div class="admin-tab" onclick="switchTab('sla-config',this)">⏱️ SLA Config</div>
+        <div class="admin-tab" onclick="switchTab('holidays',this)">🗓️ วันหยุด</div>
+        <div class="admin-tab" onclick="switchTab('sys-config',this)">🔧 System Config</div>
+        <div class="admin-tab" onclick="switchTab('audit',this)">📜 Audit Log</div>
+      </div>
+
+      <!-- ── USERS & ROLES ─────────────────────────────── -->
+      <div id="section-users" class="section active">
+        <div class="d-flex justify-between align-center mb-16">
+          <h3 class="fs-16">จัดการผู้ใช้งาน</h3>
+          <div class="d-flex gap-8">
+            <input type="text" class="form-control" id="user-search" placeholder="🔍 ค้นหา..." style="width:220px" oninput="filterUsers()">
+          </div>
+        </div>
+        <div class="card">
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>ชื่อ</th><th>Email</th><th>Role</th><th>แผนก</th>
+                  <th>LINE</th><th>เข้าสู่ระบบล่าสุด</th><th>สถานะ</th><th>จัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="users-tbody">
+                <tr><td colspan="8" class="text-center" style="padding:40px"><div class="spinner" style="margin:0 auto 16px"></div>กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── FAQ KNOWLEDGE ─────────────────────────────── -->
+      <div id="section-faq" class="section">
+        <div class="d-flex justify-between align-center mb-16">
+          <h3 class="fs-16">FAQ Knowledge Base</h3>
+          <button class="btn btn-primary btn-sm" onclick="openFAQModal()">➕ เพิ่ม FAQ</button>
+        </div>
+        <div id="faq-list">
+          <div class="empty-state"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- ── AI KNOWLEDGE BASE ──────────────────────────── -->
+      <div id="section-ai-kb" class="section">
+        <div class="d-flex justify-between align-center mb-16">
+          <h3 class="fs-16">AI Knowledge Base — อนุมัติการเรียนรู้</h3>
+          <div class="alert alert-info" style="margin:0;padding:8px 14px;font-size:12px">
+            ℹ️ AI จะเรียนรู้จาก Ticket ที่ได้รับการอนุมัติเท่านั้น
+          </div>
+        </div>
+        <div id="kb-pending-list">
+          <div class="empty-state"><div class="spinner"></div></div>
+        </div>
+        <hr style="margin:24px 0;border:none;border-top:1px solid var(--border)">
+        <h4 class="fs-14 mb-16">✅ อนุมัติแล้ว</h4>
+        <div id="kb-approved-list"></div>
+      </div>
+
+      <!-- ── SLA CONFIG ────────────────────────────────── -->
+      <div id="section-sla-config" class="section">
+        <div class="d-flex justify-between align-center mb-16">
+          <h3 class="fs-16">ตั้งค่า SLA</h3>
+        </div>
+        <div class="card mb-20">
+          <div class="card-header"><span class="card-title">⏱️ เวลาทำการ</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+              <div class="form-group">
+                <label class="form-label">เวลาเริ่มทำงาน</label>
+                <input type="time" class="form-control" id="sla-work-start" value="08:00">
+              </div>
+              <div class="form-group">
+                <label class="form-label">เวลาเลิกงาน</label>
+                <input type="time" class="form-control" id="sla-work-end" value="17:00">
+              </div>
+              <div class="form-group">
+                <label class="form-label">เริ่มพักเที่ยง</label>
+                <input type="time" class="form-control" id="sla-lunch-start" value="12:00">
+              </div>
+              <div class="form-group">
+                <label class="form-label">เลิกพักเที่ยง</label>
+                <input type="time" class="form-control" id="sla-lunch-end" value="13:00">
+              </div>
+              <div class="form-group">
+                <label class="form-label">SLA Urgent (ชั่วโมง)</label>
+                <input type="number" class="form-control" id="sla-urgent-hrs" value="8" min="1" max="72">
+              </div>
+              <div class="form-group">
+                <label class="form-label">SLA Risk Threshold (%)</label>
+                <input type="number" class="form-control" id="sla-risk-pct" value="75" min="50" max="95">
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="saveSLAConfig()">💾 บันทึก SLA Config</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── PUBLIC HOLIDAYS ───────────────────────────── -->
+      <div id="section-holidays" class="section">
+        <div class="d-flex justify-between align-center mb-16">
+          <h3 class="fs-16">วันหยุดนักขัตฤกษ์</h3>
+          <div class="d-flex gap-8">
+            <select class="form-control" id="holiday-year-filter" style="width:120px" onchange="loadHolidays()">
+              <option>2025</option><option selected>2026</option><option>2027</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="openHolidayModal()">➕ เพิ่มวันหยุด</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body" id="holiday-list">
+            <div class="empty-state"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── SYSTEM CONFIG ──────────────────────────────── -->
+      <div id="section-sys-config" class="section">
+        <div class="d-flex justify-between align-center mb-16">
+          <h3 class="fs-16">System Configuration</h3>
+          <div class="alert alert-warning" style="margin:0;padding:8px 14px;font-size:12px">
+            ⚠️ เปลี่ยนค่าเหล่านี้ด้วยความระมัดระวัง
+          </div>
+        </div>
+        <div class="card">
+          <div id="sys-config-list">
+            <div style="padding:40px;text-align:center"><div class="spinner" style="margin:0 auto 16px"></div>กำลังโหลด...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── AUDIT LOG ──────────────────────────────────── -->
+      <div id="section-audit" class="section">
+        <div class="d-flex justify-between align-center mb-16">
+          <h3 class="fs-16">Audit Log</h3>
+          <div class="d-flex gap-8">
+            <input type="text" class="form-control" id="audit-search" placeholder="🔍 ค้นหา..." style="width:220px" oninput="filterAudit()">
+            <select class="form-control" id="audit-action-filter" onchange="filterAudit()" style="width:180px">
+              <option value="">ทุก Action</option>
+              <option>CREATE_TICKET</option><option>UPDATE_STATUS</option><option>CLOSE_TICKET</option>
+              <option>ASSIGN_TICKET</option><option>CREATE_USER</option><option>UPDATE_ROLE</option>
+              <option>SLA_UPDATE</option><option>KB_APPROVED</option><option>CONFIG_UPDATE</option>
+            </select>
+          </div>
+        </div>
+        <div class="card">
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr><th>เวลา</th><th>ผู้ดำเนินการ</th><th>Role</th><th>Action</th><th>Entity</th><th>ID</th><th>รายละเอียด</th></tr>
+              </thead>
+              <tbody id="audit-tbody">
+                <tr><td colspan="7" class="text-center" style="padding:40px"><div class="spinner" style="margin:0 auto 16px"></div>กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+            <span class="text-muted fs-12" id="audit-count"></span>
+            <button class="btn btn-secondary btn-sm" onclick="loadMoreAudit()">โหลดเพิ่ม</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── Role Change Modal ────────────────────────────────── -->
+<div class="modal-overlay" id="role-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">🔑 เปลี่ยน Role</span>
+      <button class="modal-close" onclick="closeModal('role-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">ผู้ใช้</label>
+        <input class="form-control" id="role-user-email" readonly>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role ใหม่</label>
+        <select class="form-control" id="role-select">
+          <option value="USER">USER — พนักงานทั่วไป</option>
+          <option value="IT_STAFF">IT_STAFF — IT Support</option>
+          <option value="IT_MANAGER">IT_MANAGER — IT Manager</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('role-modal')">ยกเลิก</button>
+      <button class="btn btn-primary"   onclick="saveRole()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── FAQ Modal ────────────────────────────────────────── -->
+<div class="modal-overlay" id="faq-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title" id="faq-modal-title">➕ เพิ่ม FAQ</span>
+      <button class="modal-close" onclick="closeModal('faq-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="form-group">
+          <label class="form-label">คำถาม (ภาษาไทย) <span class="required">*</span></label>
+          <textarea class="form-control" id="faq-q-th" rows="3" placeholder="คำถามเป็นภาษาไทย..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Question (English)</label>
+          <textarea class="form-control" id="faq-q-en" rows="3" placeholder="Question in English..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">คำตอบ (ภาษาไทย) <span class="required">*</span></label>
+          <textarea class="form-control" id="faq-a-th" rows="4" placeholder="คำตอบเป็นภาษาไทย..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Answer (English)</label>
+          <textarea class="form-control" id="faq-a-en" rows="4" placeholder="Answer in English..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Keywords (ภาษาไทย)</label>
+          <input class="form-control" id="faq-kw-th" placeholder="คำสำคัญ,คั่นด้วยคอมมา">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Keywords (English)</label>
+          <input class="form-control" id="faq-kw-en" placeholder="keyword,comma,separated">
+        </div>
+        <div class="form-group">
+          <label class="form-label">ประเภท Ticket ที่เกี่ยวข้อง</label>
+          <select class="form-control" id="faq-type">
+            <option value="">— ทั่วไป —</option>
+            <option>Hardware</option><option>Software</option><option>Server/Network</option>
+            <option>Account &amp; Access Management</option><option>Backup / Recovery</option>
+            <option>Fixed Assets</option><option>IT Equipment / Consultation</option><option>MA Renewal</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('faq-modal')">ยกเลิก</button>
+      <button class="btn btn-primary"   onclick="saveFAQ()">💾 บันทึก FAQ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Holiday Modal ─────────────────────────────────────── -->
+<div class="modal-overlay" id="holiday-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">🗓️ เพิ่มวันหยุด</span>
+      <button class="modal-close" onclick="closeModal('holiday-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">วันที่ <span class="required">*</span></label>
+        <input type="date" class="form-control" id="holiday-date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">ชื่อวันหยุด (ภาษาไทย) <span class="required">*</span></label>
+        <input class="form-control" id="holiday-name-th" placeholder="เช่น วันสงกรานต์">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Holiday Name (English)</label>
+        <input class="form-control" id="holiday-name-en" placeholder="e.g. Songkran Festival">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('holiday-modal')">ยกเลิก</button>
+      <button class="btn btn-primary"   onclick="saveHoliday()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+  // ── Auth Guard (Manager only) ───────────────────────────────
+  if (!loadStoredSession()) { location.href='index.html'; }
+  if (!isITStaff()) { location.href='dashboard.html'; }
+
+  const user = getCurrentUser();
+  if (user) {
+    document.getElementById('user-name').textContent = user.display_name||user.email;
+    document.getElementById('user-role-label').textContent = user.role;
+    document.getElementById('user-avatar').textContent = (user.display_name||'U')[0];
+  }
+
+  let allUsers=[], allFAQs=[], allAudit=[], auditLimit=100;
+
+  window.addEventListener('load', async () => {
+    await Promise.all([ loadUsers(), loadFAQs(), loadAuditLog(), loadKBPending(), loadSysConfig() ]);
+    loadHolidays();
+  });
+
+  // ── Tab Switch ──────────────────────────────────────────────
+  function switchTab(name, el) {
+    document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+    document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active'));
+    document.getElementById('section-'+name).classList.add('active');
+    el.classList.add('active');
+  }
+
+  // ── USERS ───────────────────────────────────────────────────
+  async function loadUsers() {
+    const res = await API.get('users');
+    allUsers = res.success ? res.data : [];
+    renderUsers(allUsers);
+  }
+
+  function renderUsers(users) {
+    document.getElementById('users-tbody').innerHTML = users.map(u=>`
+      <tr>
+        <td><div class="fw-600">${u.display_name||'—'}</div><div class="text-muted fs-11">${u.line_display_name||''}</div></td>
+        <td class="fs-12">${u.email}</td>
+        <td><span class="role-badge role-${u.role}">${u.role||'USER'}</span></td>
+        <td class="fs-12">${u.department||'—'}</td>
+        <td class="fs-12">${u.line_user_id?'✅ เชื่อมต่อแล้ว':'<span class="text-muted">—</span>'}</td>
+        <td class="fs-12 text-muted">${formatDate(u.last_login)}</td>
+        <td><span style="color:${u.is_active==='TRUE'?'var(--secondary)':'var(--danger)'}">${u.is_active==='TRUE'?'✅ Active':'❌ Inactive'}</span></td>
+        <td>
+          ${isManager()?`<button class="btn btn-secondary btn-sm" onclick="openRoleModal('${u.email}','${u.role||'USER'}')">🔑 Role</button>`:''}
+        </td>
+      </tr>`).join('') || '<tr><td colspan="8" class="text-center text-muted" style="padding:24px">ไม่มีผู้ใช้งาน</td></tr>';
+  }
+
+  function filterUsers() {
+    const kw = document.getElementById('user-search').value.toLowerCase();
+    renderUsers(allUsers.filter(u=>
+      (u.display_name||'').toLowerCase().includes(kw)||
+      (u.email||'').toLowerCase().includes(kw)||
+      (u.department||'').toLowerCase().includes(kw)
+    ));
+  }
+
+  function openRoleModal(email, role) {
+    document.getElementById('role-user-email').value = email;
+    document.getElementById('role-select').value = role;
+    openModal('role-modal');
+  }
+
+  async function saveRole() {
+    const email = document.getElementById('role-user-email').value;
+    const role  = document.getElementById('role-select').value;
+    showLoader('กำลังบันทึก...');
+    try {
+      const res = await API.post('user/role', { email, role });
+      if (res.success) {
+        showToast('เปลี่ยน Role สำเร็จ', 'success');
+        closeModal('role-modal');
+        await loadUsers();
+      } else showToast(res.data?.error||'เกิดข้อผิดพลาด','error');
+    } catch(e) { showToast('เกิดข้อผิดพลาด','error'); }
+    finally { hideLoader(); }
+  }
+
+  // ── FAQ ─────────────────────────────────────────────────────
+  async function loadFAQs() {
+    const res = await API.get('faq');
+    allFAQs = res.success ? res.data : [];
+    renderFAQs(allFAQs);
+  }
+
+  function renderFAQs(faqs) {
+    document.getElementById('faq-list').innerHTML = faqs.length
+      ? faqs.map((f,i)=>`
+        <div class="kb-card ${f.is_active==='TRUE'?'kb-approved':''}">
+          <div class="d-flex justify-between align-center mb-8">
+            <span class="fw-600 fs-13">${f.question_th||'—'}</span>
+            <div class="d-flex gap-8">
+              <span class="text-muted fs-11">ถูกใช้ ${f.usage_count||0} ครั้ง</span>
+              <span class="badge" style="background:${f.is_active==='TRUE'?'#e6f4ea':'#fce8e6'};color:${f.is_active==='TRUE'?'#137333':'#c62828'}">${f.is_active==='TRUE'?'Active':'Inactive'}</span>
+            </div>
+          </div>
+          <div class="text-secondary fs-12 mb-8">${f.answer_th||'—'}</div>
+          <div class="d-flex gap-8 fs-11 text-muted">
+            <span>🏷️ ${f.ticket_type||'ทั่วไป'}</span>
+            <span>🔑 ${f.keywords_th||'—'}</span>
+          </div>
+        </div>`).join('')
+      : '<div class="empty-state"><div class="empty-icon">📖</div><h3>ยังไม่มี FAQ</h3><p>เพิ่ม FAQ เพื่อให้ AI ตอบได้เร็วขึ้น</p></div>';
+  }
+
+  function openFAQModal() {
+    ['faq-q-th','faq-q-en','faq-a-th','faq-a-en','faq-kw-th','faq-kw-en'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('faq-type').value='';
+    openModal('faq-modal');
+  }
+
+  async function saveFAQ() {
+    const qTh = document.getElementById('faq-q-th').value.trim();
+    const aTh = document.getElementById('faq-a-th').value.trim();
+    if (!qTh||!aTh) { showToast('กรุณากรอกคำถามและคำตอบภาษาไทย','warning'); return; }
+    showLoader('กำลังบันทึก...');
+    try {
+      const res = await API.post('faq/create',{
+        question_th: qTh, question_en: document.getElementById('faq-q-en').value,
+        answer_th:   aTh, answer_en:   document.getElementById('faq-a-en').value,
+        keywords_th: document.getElementById('faq-kw-th').value,
+        keywords_en: document.getElementById('faq-kw-en').value,
+        ticket_type: document.getElementById('faq-type').value
+      });
+      if (res.success) {
+        showToast('เพิ่ม FAQ สำเร็จ','success');
+        closeModal('faq-modal');
+        await loadFAQs();
+      } else showToast(res.data?.error||'เกิดข้อผิดพลาด','error');
+    } catch(e) { showToast('เกิดข้อผิดพลาด','error'); }
+    finally { hideLoader(); }
+  }
+
+  // ── AI KNOWLEDGE BASE ────────────────────────────────────────
+  async function loadKBPending() {
+    const [tRes, kbRes] = await Promise.all([ API.get('tickets'), API.get('kb') ]);
+    const tickets = tRes.success ? tRes.data : [];
+    const approvedIds = new Set((kbRes.success?kbRes.data:[]).map(k=>k.source_ticket_id));
+
+    const pending  = tickets.filter(t=>t.ai_approved_learning==='PENDING' && t.resolution);
+    const approved = (kbRes.success?kbRes.data:[]).filter(k=>k.is_active==='TRUE');
+
+    document.getElementById('kb-pending-list').innerHTML = pending.length
+      ? pending.map(t=>`
+        <div class="kb-card kb-pending">
+          <div class="d-flex justify-between align-center mb-8">
+            <span class="fw-600 fs-13">${t.ticket_id} — ${t.title}</span>
+            <span class="badge" style="background:#fff3e0;color:#e65100">รอการอนุมัติ</span>
+          </div>
+          <div class="text-secondary fs-12 mb-4"><b>ปัญหา:</b> ${(t.description||'').slice(0,120)}</div>
+          <div class="text-secondary fs-12 mb-4"><b>วิธีแก้:</b> ${(t.resolution||'').slice(0,120)}</div>
+          <div class="text-secondary fs-12 mb-12"><b>Root Cause:</b> ${t.root_cause||'—'}</div>
+          ${isManager()?`<div class="d-flex gap-8">
+            <button class="btn btn-success btn-sm" onclick="approveKB('${t.ticket_id}')">✅ อนุมัติ</button>
+            <button class="btn btn-secondary btn-sm" onclick="rejectKB('${t.ticket_id}')">❌ ปฏิเสธ</button>
+          </div>`:'<div class="text-muted fs-12">ต้องการสิทธิ์ IT Manager เพื่ออนุมัติ</div>'}
+        </div>`).join('')
+      : '<div class="empty-state"><div class="empty-icon">🤖</div><h3>ไม่มีรอการอนุมัติ</h3></div>';
+
+    document.getElementById('kb-approved-list').innerHTML = approved.length
+      ? approved.map(kb=>`
+        <div class="kb-card kb-approved">
+          <div class="d-flex justify-between mb-4">
+            <span class="fw-600 fs-12">${kb.source_ticket_id} — ${kb.ticket_type}</span>
+            <span class="text-muted fs-11">อนุมัติโดย ${kb.approved_by} • ใช้งาน ${kb.usage_count||0} ครั้ง</span>
+          </div>
+          <div class="fs-12 text-secondary">${(kb.problem_th||'').slice(0,100)}</div>
+        </div>`).join('')
+      : '<div class="text-muted fs-13">ยังไม่มีข้อมูลใน Knowledge Base</div>';
+  }
+
+  async function approveKB(ticketId) {
+    if (!confirm('อนุมัติให้ AI เรียนรู้จาก Ticket นี้?')) return;
+    showLoader('กำลังอนุมัติ...');
+    try {
+      const res = await API.post('ai/approve-kb', { ticket_id: ticketId });
+      if (res.success) { showToast('อนุมัติสำเร็จ — AI จะเรียนรู้จาก Ticket นี้','success'); await loadKBPending(); }
+      else showToast(res.data?.error||'เกิดข้อผิดพลาด','error');
+    } catch(e) { showToast('เกิดข้อผิดพลาด','error'); }
+    finally { hideLoader(); }
+  }
+
+  async function rejectKB(ticketId) {
+    if (!confirm('ปฏิเสธการเรียนรู้จาก Ticket นี้?')) return;
+    const res = await API.post('ticket/update',{ ticket_id: ticketId, ai_approved_learning: 'FALSE' });
+    if (res.success) { showToast('ปฏิเสธแล้ว','info'); await loadKBPending(); }
+  }
+
+  // ── SLA CONFIG ───────────────────────────────────────────────
+  async function saveSLAConfig() {
+    const configs = [
+      { key:'SLA_WORK_START',  value: document.getElementById('sla-work-start').value },
+      { key:'SLA_WORK_END',    value: document.getElementById('sla-work-end').value },
+      { key:'SLA_LUNCH_START', value: document.getElementById('sla-lunch-start').value },
+      { key:'SLA_LUNCH_END',   value: document.getElementById('sla-lunch-end').value },
+      { key:'SLA_URGENT_HRS',  value: document.getElementById('sla-urgent-hrs').value },
+      { key:'SLA_RISK_PCT',    value: document.getElementById('sla-risk-pct').value }
+    ];
+    showLoader('กำลังบันทึก...');
+    try {
+      await Promise.all(configs.map(c=>API.post('system/config',c)));
+      showToast('บันทึก SLA Config สำเร็จ','success');
+    } catch(e) { showToast('เกิดข้อผิดพลาด','error'); }
+    finally { hideLoader(); }
+  }
+
+  // ── HOLIDAYS ─────────────────────────────────────────────────
+  async function loadHolidays() {
+    const year = document.getElementById('holiday-year-filter')?.value || '2026';
+    const res  = await API.get('holidays', { year });
+    const holidays = res.success ? res.data : [];
+    document.getElementById('holiday-list').innerHTML = holidays.length
+      ? holidays.map(h=>`
+        <div class="holiday-row">
+          <div class="fw-600 fs-13">${formatDate(h.holiday_date).split(' ')[0]}</div>
+          <div>
+            <div class="fw-600 fs-13">${h.holiday_name_th||'—'}</div>
+            <div class="text-muted fs-11">${h.holiday_name_en||''}</div>
+          </div>
+          <div><span class="badge" style="background:${h.is_active==='TRUE'?'#e6f4ea':'#f5f5f5'};color:${h.is_active==='TRUE'?'#137333':'#999'}">${h.is_active==='TRUE'?'Active':'Inactive'}</span></div>
+          <div></div>
+        </div>`).join('')
+      : '<div class="empty-state"><div class="empty-icon">🗓️</div><h3>ยังไม่มีวันหยุด</h3></div>';
+  }
+
+  function openHolidayModal() { openModal('holiday-modal'); }
+  async function saveHoliday() {
+    const date  = document.getElementById('holiday-date').value;
+    const nameTH= document.getElementById('holiday-name-th').value.trim();
+    if (!date||!nameTH) { showToast('กรุณากรอกวันที่และชื่อวันหยุด','warning'); return; }
+    showLoader('กำลังบันทึก...');
+    try {
+      const res = await API.post('holiday/create',{
+        date, name_th: nameTH, name_en: document.getElementById('holiday-name-en').value
+      });
+      if (res.success) { showToast('เพิ่มวันหยุดสำเร็จ','success'); closeModal('holiday-modal'); await loadHolidays(); }
+      else showToast(res.data?.error||'เกิดข้อผิดพลาด','error');
+    } catch(e) { showToast('เกิดข้อผิดพลาด','error'); }
+    finally { hideLoader(); }
+  }
+
+  // ── SYSTEM CONFIG ────────────────────────────────────────────
+  const SAFE_DISPLAY_KEYS = ['FRONTEND_URL','IT_EMAIL_GROUP','ALLOWED_DOMAIN','AI_INTERACTION_THRESHOLD','REOPEN_WINDOW_DAYS','BACKUP_EMAIL'];
+  const SENSITIVE_KEYS    = ['GEMINI_API_KEY','LINE_CHANNEL_ACCESS_TOKEN','LINE_CHANNEL_SECRET'];
+
+  async function loadSysConfig() {
+    const res = await API.get('system/config');
+    if (!res.success) return;
+    const configs = Array.isArray(res.data) ? res.data : Object.entries(res.data||{}).map(([k,v])=>({config_key:k,config_value:v,description:''}));
+    const container = document.getElementById('sys-config-list');
+    container.innerHTML = configs.map(c=>{
+      const isSensitive = SENSITIVE_KEYS.includes(c.config_key);
+      const displayVal  = isSensitive ? (c.config_value?'••••••••••••':'(ยังไม่ได้ตั้งค่า)') : (c.config_value||'');
+      return `<div class="config-row">
+        <div>
+          <div class="config-key">${c.config_key}</div>
+          <div class="config-desc">${c.description||''}</div>
+        </div>
+        <input class="form-control" value="${displayVal}" id="cfg-${c.config_key.replace(/\W/g,'_')}"
+               type="${isSensitive?'password':'text'}" placeholder="${c.config_value?'':'(ว่างอยู่)'}">
+        <button class="btn btn-primary btn-sm" onclick="saveSingleConfig('${c.config_key}','cfg-${c.config_key.replace(/\W/g,'_')}')">💾</button>
+      </div>`;
+    }).join('');
+  }
+
+  async function saveSingleConfig(key, inputId) {
+    const value = document.getElementById(inputId)?.value;
+    if (!value && !confirm('บันทึกค่าว่างสำหรับ '+key+'?')) return;
+    showLoader('กำลังบันทึก...');
+    try {
+      await API.post('system/config', { key, value });
+      showToast('บันทึก '+key+' สำเร็จ','success');
+    } catch(e) { showToast('เกิดข้อผิดพลาด','error'); }
+    finally { hideLoader(); }
+  }
+
+  // ── AUDIT LOG ────────────────────────────────────────────────
+  async function loadAuditLog() {
+    const res = await API.get('audit', { limit: auditLimit });
+    allAudit = res.success ? res.data : [];
+    renderAudit(allAudit);
+  }
+
+  function renderAudit(logs) {
+    document.getElementById('audit-count').textContent = logs.length + ' รายการ';
+    document.getElementById('audit-tbody').innerHTML = logs.map(l=>`
+      <tr>
+        <td class="fs-11 text-muted">${formatDate(l.timestamp)}</td>
+        <td class="fs-12">${l.actor_email}</td>
+        <td><span class="role-badge role-${l.actor_role||'USER'}" style="font-size:10px">${l.actor_role||'—'}</span></td>
+        <td><span class="badge" style="background:var(--surface-alt);color:var(--text-secondary);font-size:11px">${l.action}</span></td>
+        <td class="fs-12">${l.entity_type}</td>
+        <td class="fs-11" style="color:var(--primary)">${l.entity_id}</td>
+        <td class="fs-11 text-secondary" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+            title="${(l.new_value||'').replace(/"/g,'&quot;')}">${(l.new_value||l.notes||'').slice(0,60)}</td>
+      </tr>`).join('') || '<tr><td colspan="7" class="text-center text-muted" style="padding:24px">ไม่มีข้อมูล</td></tr>';
+  }
+
+  function filterAudit() {
+    const kw     = document.getElementById('audit-search').value.toLowerCase();
+    const action = document.getElementById('audit-action-filter').value;
+    renderAudit(allAudit.filter(l=>{
+      if (action && l.action!==action) return false;
+      if (kw && !JSON.stringify(l).toLowerCase().includes(kw)) return false;
+      return true;
+    }));
+  }
+
+  async function loadMoreAudit() {
+    auditLimit += 100;
+    await loadAuditLog();
+  }
+</script>
+</body>
+</html>
