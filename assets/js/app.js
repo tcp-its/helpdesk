@@ -5,7 +5,7 @@
 
 // ── Configuration (update before deploy) ─────────────────────
 const APP_CONFIG = {
-  API_URL:       'https://script.google.com/macros/s/AKfycbzKE89ZHJGKyZtg8dmfyiW8ne_VmVmsWp-bK2Rs737frapEqba209EJ8X7AwB6G_jx4Fg/exec',
+  API_URL:       'https://script.google.com/macros/s/AKfycbzM4WxnSqQRcluqEwNgzH2ObHDpZJ6--Zv_P1S-l-fISiPy3uCT2BNZ4ce7LPgSQh8x7Q/exec',
   GOOGLE_CLIENT_ID: '705896921657-6ode8bfmctd787npb0ddknmvdunrq2t3.apps.googleusercontent.com',
   SYSTEM_NAME:   'TCP Smart IT Desk',
   VERSION:       '1.0.0'
