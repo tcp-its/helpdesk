@@ -63,10 +63,8 @@
 
       <!-- Google Sign-In Button -->
       <div id="sign-in-state">
-        <button class="google-btn" id="google-signin-btn" onclick="signInWithGoogle()">
-          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
-          เข้าสู่ระบบด้วย Google Workspace
-        </button>
+        <!-- Google renders its own button here -->
+        <div id="g_id_signin" style="display:flex;justify-content:center;margin-bottom:8px"></div>
         <p class="domain-note">🔒 เฉพาะบัญชี @tcpharmachem.com เท่านั้น</p>
       </div>
 
@@ -82,10 +80,7 @@
           <span>⚠️</span>
           <span id="error-msg"></span>
         </div>
-        <button class="google-btn" onclick="signInWithGoogle()">
-          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
-          ลองใหม่อีกครั้ง
-        </button>
+        <div id="g_id_signin_retry" style="display:flex;justify-content:center;margin-top:12px"></div>
       </div>
 
       <p class="version">TCP Smart IT Desk v1.0 • Powered by Gemini AI</p>
@@ -106,26 +101,25 @@
     });
 
     function initGoogleSignIn() {
-      // Initialize GIS (Google Identity Services)
       if (typeof google === 'undefined') {
         setTimeout(initGoogleSignIn, 300);
         return;
       }
       google.accounts.id.initialize({
-        client_id:         APP_CONFIG.GOOGLE_CLIENT_ID,
-        callback:          handleGoogleResponse,
-        auto_select:       false,
-        cancel_on_tap_outside: true,
-        ux_mode:           'popup'
+        client_id: APP_CONFIG.GOOGLE_CLIENT_ID,
+        callback:  handleGoogleResponse,
+        auto_select: false,
+        ux_mode:   'popup'
       });
-    }
-
-    function signInWithGoogle() {
-      if (typeof google === 'undefined') {
-        showError('ไม่สามารถโหลด Google Sign-In ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต');
-        return;
-      }
-      google.accounts.id.prompt();
+      // Render official Google Sign-In button
+      google.accounts.id.renderButton(
+        document.getElementById('g_id_signin'),
+        { theme: 'outline', size: 'large', width: 320, text: 'signin_with', locale: 'th' }
+      );
+      google.accounts.id.renderButton(
+        document.getElementById('g_id_signin_retry'),
+        { theme: 'outline', size: 'large', width: 320, text: 'signin_with', locale: 'th' }
+      );
     }
 
     async function handleGoogleResponse(credentialResponse) {
