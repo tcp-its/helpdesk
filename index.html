@@ -8,14 +8,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/main.css">
   <style>
-    .features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 28px 0; text-align: left; }
-    .feature { display: flex; align-items: flex-start; gap: 10px; padding: 12px; background: rgba(255,255,255,.05); border-radius: 10px; }
+    .features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 24px 0; text-align: left; }
+    .feature { display: flex; align-items: flex-start; gap: 10px; padding: 12px; background: #f4f7ff; border: 1px solid #dde8fb; border-radius: 10px; }
     .feature-icon { font-size: 20px; }
-    .feature-text { font-size: 12px; color: rgba(255,255,255,.7); }
-    .feature-title { font-size: 13px; font-weight: 600; color: #fff; }
-    .divider { border: none; border-top: 1px solid rgba(255,255,255,.1); margin: 20px 0; }
-    .domain-note { font-size: 11px; color: rgba(255,255,255,.4); margin-top: 16px; }
-    .version { font-size: 10px; color: rgba(255,255,255,.25); margin-top: 24px; }
+    .feature-text { font-size: 12px; color: #5a6478; }
+    .feature-title { font-size: 13px; font-weight: 600; color: #1e2533; }
+    .divider { border: none; border-top: 1px solid #e8edf4; margin: 20px 0; }
+    .domain-note { font-size: 11px; color: #9aa0ac; margin-top: 14px; }
+    .version { font-size: 10px; color: #b0b8c8; margin-top: 20px; }
     #loading-state { display: none; }
     .dots::after { content: ''; animation: dots 1.5s steps(4,end) infinite; }
     @keyframes dots { 0%,20%{content:''} 40%{content:'.'} 60%{content:'..'} 80%,100%{content:'...'} }
@@ -71,8 +71,8 @@
       </div>
 
       <div id="loading-state">
-        <div style="display:flex;align-items:center;justify-content:center;gap:12px;color:rgba(255,255,255,.7);font-size:14px">
-          <div class="spinner" style="width:24px;height:24px;border-width:3px;border-color:rgba(255,255,255,.3);border-top-color:#fff"></div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:12px;color:#5a6478;font-size:14px">
+          <div class="spinner" style="width:24px;height:24px;border-width:3px"></div>
           <span>กำลังเข้าสู่ระบบ<span class="dots"></span></span>
         </div>
       </div>
