@@ -156,8 +156,18 @@ const API = {
     if (_idToken) params.token = _idToken;   // token in URL → no CORS preflight
     const qs  = new URLSearchParams(params).toString();
     const url = APP_CONFIG.API_URL + '?' + qs;
-    const res = await fetch(url);            // simple GET, no custom headers
-    return res.json();
+    try {
+      const res  = await fetch(url);          // simple GET, no custom headers
+      const text = await res.text();
+      try { return JSON.parse(text); }
+      catch(e) {
+        console.error('[API.get] non-JSON response for', path, text.substring(0, 300));
+        return { success: false, data: { error: 'Server returned non-JSON response' } };
+      }
+    } catch(e) {
+      console.error('[API.get] fetch error for', path, e);
+      return { success: false, data: { error: e.message || 'Network error' } };
+    }
   },
 
   async post(path, body) {
@@ -166,11 +176,18 @@ const API = {
     // Apps Script reads body via e.postData.contents regardless of Content-Type
     const tokenParam = _idToken ? '&token=' + encodeURIComponent(_idToken) : '';
     const url = APP_CONFIG.API_URL + '?path=' + encodeURIComponent(path) + tokenParam;
-    const res = await fetch(url, {
-      method: 'POST',
-      body:   JSON.stringify(body)
-    });
-    return res.json();
+    try {
+      const res  = await fetch(url, { method: 'POST', body: JSON.stringify(body) });
+      const text = await res.text();
+      try { return JSON.parse(text); }
+      catch(e) {
+        console.error('[API.post] non-JSON response for', path, text.substring(0, 300));
+        return { success: false, data: { error: 'Server returned non-JSON response' } };
+      }
+    } catch(e) {
+      console.error('[API.post] fetch error for', path, e);
+      return { success: false, data: { error: e.message || 'Network error' } };
+    }
   }
 };
 
