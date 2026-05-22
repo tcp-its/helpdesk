@@ -162,12 +162,13 @@ const API = {
 
   async post(path, body) {
     // Token in URL param; body carries payload only → avoids Authorization header CORS issue
+    // NOTE: No Content-Type header → browser treats as simple request → no CORS preflight
+    // Apps Script reads body via e.postData.contents regardless of Content-Type
     const tokenParam = _idToken ? '&token=' + encodeURIComponent(_idToken) : '';
     const url = APP_CONFIG.API_URL + '?path=' + encodeURIComponent(path) + tokenParam;
     const res = await fetch(url, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      method: 'POST',
+      body:   JSON.stringify(body)
     });
     return res.json();
   }
