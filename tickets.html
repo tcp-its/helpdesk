@@ -201,7 +201,12 @@
 
 <!-- ── Ticket Detail Modal ──────────────────────────────── -->
 <div class="modal-overlay" id="ticket-detail-modal">
-  <div class="modal modal-xl">
+  <div class="modal modal-xl" style="position:relative">
+    <!-- Loading overlay — shown while fetching, does NOT destroy modal HTML -->
+    <div id="detail-loading" style="display:none;position:absolute;inset:0;z-index:200;background:var(--surface,#1e2533);border-radius:inherit;flex-direction:column;align-items:center;justify-content:center">
+      <div class="spinner" style="margin-bottom:12px"></div>
+      <p class="text-muted fs-13">กำลังโหลด...</p>
+    </div>
     <div class="modal-header">
       <span class="modal-title" id="detail-modal-title">รายละเอียด Ticket</span>
       <button class="modal-close" onclick="closeModal('ticket-detail-modal')">×</button>
@@ -480,18 +485,28 @@
   // ── Ticket Detail ────────────────────────────────────────────
   async function openTicketDetail(ticketId) {
     openModal('ticket-detail-modal');
-    document.getElementById('ticket-detail-content').innerHTML = '<div style="padding:60px;text-align:center"><div class="spinner" style="margin:0 auto 16px"></div><p>กำลังโหลด...</p></div>';
+    // Show overlay (does NOT destroy modal DOM elements)
+    const loadingEl = document.getElementById('detail-loading');
+    loadingEl.style.display = 'flex';
+    document.getElementById('detail-modal-title').textContent = ticketId;
 
     try {
       const [tRes, staffRes] = await Promise.all([
         API.get('ticket', { id: ticketId }),
         API.get('users/it')
       ]);
-      if (!tRes.success) { showToast('ไม่พบ Ticket', 'error'); closeModal('ticket-detail-modal'); return; }
+      if (!tRes.success) {
+        showToast('ไม่พบ Ticket: ' + (tRes.data?.error || ''), 'error');
+        closeModal('ticket-detail-modal');
+        return;
+      }
       currentTicket = tRes.data;
       renderTicketDetail(currentTicket, staffRes.data || []);
     } catch(e) {
-      showToast('เกิดข้อผิดพลาด', 'error');
+      showToast('เกิดข้อผิดพลาด: ' + (e.message || 'กรุณาลองใหม่'), 'error');
+      console.error('openTicketDetail error:', e);
+    } finally {
+      loadingEl.style.display = 'none';
     }
   }
 
