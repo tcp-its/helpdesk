@@ -767,6 +767,16 @@
   }
 
   // ── IT Actions ───────────────────────────────────────────────
+
+  // อัปเดต allTickets ในหน่วยความจำทันที แล้ว re-render ก่อน
+  // จากนั้น reload จาก server ใน background (หลัง 1.5 วิ เพื่อให้ GAS commit เสร็จ)
+  function _applyLocalUpdate(patch) {
+    const idx = allTickets.findIndex(t => t.ticket_id === currentTicket.ticket_id);
+    if (idx !== -1) allTickets[idx] = { ...allTickets[idx], ...patch };
+    applyFilters(); // re-render ทันที
+    setTimeout(loadTickets, 1500); // reload จาก server ใน background
+  }
+
   async function saveTicketUpdate() {
     const status     = document.getElementById('detail-status-select').value;
     const assignee   = document.getElementById('detail-assign-select').value;
@@ -775,14 +785,24 @@
 
     showLoader('กำลังบันทึก...');
     try {
-      await Promise.all([
-        API.post('ticket/status',  { ticket_id: currentTicket.ticket_id, status }),
-        assignee ? API.post('ticket/assign', { ticket_id: currentTicket.ticket_id, assignee_email: assignee }) : Promise.resolve(),
-        API.post('ticket/update',  { ticket_id: currentTicket.ticket_id, resolution, root_cause: rootcause })
+      const results = await Promise.all([
+        API.post('ticket/status', { ticket_id: currentTicket.ticket_id, status }),
+        assignee
+          ? API.post('ticket/assign', { ticket_id: currentTicket.ticket_id, assignee_email: assignee })
+          : Promise.resolve({ success: true }),
+        API.post('ticket/update', { ticket_id: currentTicket.ticket_id, resolution, root_cause: rootcause })
       ]);
+
+      // ตรวจสอบว่า API call ทุกตัวสำเร็จ
+      const failed = results.find(r => r && r.success === false);
+      if (failed) {
+        showToast('เกิดข้อผิดพลาด: ' + (failed.data?.error || 'กรุณาลองใหม่'), 'error');
+        return;
+      }
+
       showToast('บันทึกสำเร็จ', 'success');
-      await loadTickets();
       closeModal('ticket-detail-modal');
+      _applyLocalUpdate({ status, resolution, root_cause: rootcause });
     } catch(e) {
       showToast('เกิดข้อผิดพลาด', 'error');
     } finally { hideLoader(); }
@@ -798,8 +818,13 @@
         resolution,
         root_cause: document.getElementById('detail-rootcause-input').value
       });
-      if (res.success) { showToast('ปิด Ticket สำเร็จ', 'success'); await loadTickets(); closeModal('ticket-detail-modal'); }
-      else showToast(res.data?.error || 'เกิดข้อผิดพลาด', 'error');
+      if (res.success) {
+        showToast('ปิด Ticket สำเร็จ', 'success');
+        closeModal('ticket-detail-modal');
+        _applyLocalUpdate({ status: 'Done', resolution });
+      } else {
+        showToast(res.data?.error || 'เกิดข้อผิดพลาด', 'error');
+      }
     } catch(e) { showToast('เกิดข้อผิดพลาด', 'error'); }
     finally { hideLoader(); }
   }
