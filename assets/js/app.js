@@ -146,26 +146,27 @@ function loadStoredSession() {
 }
 
 // ── API Client ────────────────────────────────────────────────
+// NOTE: Token is passed as URL query param (not Authorization header)
+// to avoid CORS preflight failures with Apps Script web apps.
+// Apps Script reads token from e.parameter.token in authenticateRequest().
 const API = {
   async get(path, params) {
     params = params || {};
     params.path = path;
+    if (_idToken) params.token = _idToken;   // token in URL → no CORS preflight
     const qs  = new URLSearchParams(params).toString();
     const url = APP_CONFIG.API_URL + '?' + qs;
-    const res = await fetch(url, {
-      headers: _idToken ? { 'Authorization': 'Bearer ' + _idToken } : {}
-    });
+    const res = await fetch(url);            // simple GET, no custom headers
     return res.json();
   },
 
   async post(path, body) {
-    const url = APP_CONFIG.API_URL + '?path=' + path;
+    // Token in URL param; body carries payload only → avoids Authorization header CORS issue
+    const tokenParam = _idToken ? '&token=' + encodeURIComponent(_idToken) : '';
+    const url = APP_CONFIG.API_URL + '?path=' + encodeURIComponent(path) + tokenParam;
     const res = await fetch(url, {
       method:  'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'Authorization': _idToken ? 'Bearer ' + _idToken : ''
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
     return res.json();
