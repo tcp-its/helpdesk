@@ -206,31 +206,54 @@
 
       <!-- ── AUDIT LOG ──────────────────────────────────── -->
       <div id="section-audit" class="section">
-        <div class="d-flex justify-between align-center mb-16">
-          <h3 class="fs-16">Audit Log</h3>
-          <div class="d-flex gap-8">
-            <input type="text" class="form-control" id="audit-search" placeholder="🔍 ค้นหา..." style="width:220px" oninput="filterAudit()">
-            <select class="form-control" id="audit-action-filter" onchange="filterAudit()" style="width:180px">
+        <div class="d-flex justify-between align-center mb-16" style="flex-wrap:wrap;gap:10px">
+          <h3 class="fs-16">📜 Audit Log</h3>
+          <div class="d-flex gap-8" style="flex-wrap:wrap;align-items:center">
+            <input type="text" class="form-control" id="audit-search" placeholder="🔍 ค้นหา..." style="width:180px" oninput="filterAudit()">
+            <select class="form-control" id="audit-action-filter" onchange="filterAudit()" style="width:170px">
               <option value="">ทุก Action</option>
-              <option>CREATE_TICKET</option><option>UPDATE_STATUS</option><option>CLOSE_TICKET</option>
-              <option>ASSIGN_TICKET</option><option>CREATE_USER</option><option>UPDATE_ROLE</option>
-              <option>SLA_UPDATE</option><option>KB_APPROVED</option><option>CONFIG_UPDATE</option>
+              <option value="CREATE_TICKET">เปิด Ticket ใหม่</option>
+              <option value="UPDATE_STATUS">เปลี่ยนสถานะ</option>
+              <option value="CLOSE_TICKET">ปิด Ticket</option>
+              <option value="ASSIGN_TICKET">มอบหมายงาน</option>
+              <option value="ADD_RESOLUTION">เพิ่มวิธีแก้ไข</option>
+              <option value="CREATE_USER">สร้างผู้ใช้งาน</option>
+              <option value="UPDATE_ROLE">เปลี่ยนสิทธิ์</option>
+              <option value="SLA_BREACH">SLA เกินกำหนด</option>
+              <option value="KB_APPROVED">อนุมัติ Knowledge Base</option>
+              <option value="CONFIG_UPDATE">แก้ไขการตั้งค่า</option>
             </select>
+          </div>
+        </div>
+        <div class="card mb-12" style="padding:14px 16px">
+          <div class="d-flex gap-12 align-center" style="flex-wrap:wrap">
+            <div>
+              <div class="form-label" style="font-size:11px;margin-bottom:4px">วันที่เริ่มต้น</div>
+              <input type="date" class="form-control" id="audit-date-from" onchange="filterAudit()" style="width:150px">
+            </div>
+            <div>
+              <div class="form-label" style="font-size:11px;margin-bottom:4px">วันที่สิ้นสุด</div>
+              <input type="date" class="form-control" id="audit-date-to" onchange="filterAudit()" style="width:150px">
+            </div>
+            <div style="padding-top:18px;display:flex;gap:8px">
+              <button class="btn btn-secondary btn-sm" onclick="clearAuditFilters()">✖ ล้าง</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportAuditExcel()">📥 Export Excel</button>
+            </div>
+            <span class="text-muted fs-12" id="audit-count" style="padding-top:18px"></span>
           </div>
         </div>
         <div class="card">
           <div class="table-wrapper">
             <table>
               <thead>
-                <tr><th>เวลา</th><th>ผู้ดำเนินการ</th><th>Role</th><th>Action</th><th>Entity</th><th>ID</th><th>รายละเอียด</th></tr>
+                <tr><th>วันที่/เวลา</th><th>ผู้ดำเนินการ</th><th>Role</th><th>การดำเนินการ</th><th>รายละเอียด</th></tr>
               </thead>
               <tbody id="audit-tbody">
-                <tr><td colspan="7" class="text-center" style="padding:40px"><div class="spinner" style="margin:0 auto 16px"></div>กำลังโหลด...</td></tr>
+                <tr><td colspan="5" class="text-center" style="padding:40px"><div class="spinner" style="margin:0 auto 16px"></div>กำลังโหลด...</td></tr>
               </tbody>
             </table>
           </div>
-          <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-            <span class="text-muted fs-12" id="audit-count"></span>
+          <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end">
             <button class="btn btn-secondary btn-sm" onclick="loadMoreAudit()">โหลดเพิ่ม</button>
           </div>
         </div>
@@ -627,35 +650,106 @@
   }
 
   // ── AUDIT LOG ────────────────────────────────────────────────
+  const AUDIT_TH = {
+    CREATE_TICKET:'เปิด Ticket ใหม่', UPDATE_TICKET:'แก้ไข Ticket', UPDATE_STATUS:'เปลี่ยนสถานะ',
+    ASSIGN_TICKET:'มอบหมายงาน', CLOSE_TICKET:'ปิด Ticket', REOPEN_TICKET:'เปิด Ticket ใหม่อีกครั้ง',
+    ADD_RESOLUTION:'เพิ่มวิธีแก้ไข', SATISFACTION_SCORE:'ให้คะแนน', SLA_UPDATE:'อัปเดต SLA',
+    SLA_BREACH:'SLA เกินกำหนด', CREATE_USER:'สร้างผู้ใช้งาน', UPDATE_USER:'แก้ไขผู้ใช้',
+    UPDATE_ROLE:'เปลี่ยนสิทธิ์', USER_LOGIN:'เข้าสู่ระบบ', KB_APPROVED:'อนุมัติ Knowledge Base',
+    CONFIG_UPDATE:'แก้ไขการตั้งค่า', FAQ_CREATED:'สร้าง FAQ', FAQ_UPDATED:'แก้ไข FAQ',
+    AI_RESPONSE:'AI ตอบคำถาม', FAQ_MATCH:'ตอบจาก FAQ', GEMINI_CALL:'เรียกใช้ AI'
+  };
+  const AUDIT_ICON = {
+    CREATE_TICKET:'🎫', UPDATE_STATUS:'🔄', CLOSE_TICKET:'✅', ASSIGN_TICKET:'👤',
+    ADD_RESOLUTION:'💡', UPDATE_ROLE:'🔑', SLA_BREACH:'🚨', KB_APPROVED:'📚',
+    CONFIG_UPDATE:'⚙️', CREATE_USER:'👥', USER_LOGIN:'🔐', FAQ_CREATED:'❓'
+  };
+
+  function parseAuditDetail(action, newValue) {
+    if (!newValue) return '—';
+    try {
+      const obj = JSON.parse(newValue);
+      if (typeof obj !== 'object' || Array.isArray(obj)) return String(newValue).slice(0,80);
+      const FIELD_TH = { status:'สถานะ', resolution:'วิธีแก้ไข', root_cause:'สาเหตุ',
+        assigned_name:'มอบหมายให้', priority:'ความเร่งด่วน', role:'สิทธิ์', value:'ค่า',
+        ticket_type:'ประเภท', title:'ชื่อปัญหา', score:'คะแนน' };
+      return Object.entries(obj)
+        .filter(([k,v]) => v !== '' && v !== null && !['ticket_id','log_id','created_at','updated_at','attachment_urls','similar_tickets','ai_approved_learning'].includes(k))
+        .slice(0,3)
+        .map(([k,v]) => `<span style="color:var(--text-muted)">${FIELD_TH[k]||k}:</span> ${String(v).slice(0,60)}`)
+        .join(' &nbsp;|&nbsp; ') || '—';
+    } catch(e) { return String(newValue).slice(0,80); }
+  }
+
   async function loadAuditLog() {
     const res = await API.get('audit', { limit: auditLimit });
     allAudit = res.success ? res.data : [];
-    renderAudit(allAudit);
+    filterAudit();
   }
 
   function renderAudit(logs) {
     document.getElementById('audit-count').textContent = logs.length + ' รายการ';
-    document.getElementById('audit-tbody').innerHTML = logs.map(l=>`
-      <tr>
-        <td class="fs-11 text-muted">${formatDate(l.timestamp)}</td>
-        <td class="fs-12">${l.actor_email}</td>
-        <td><span class="role-badge role-${l.actor_role||'USER'}" style="font-size:10px">${l.actor_role||'—'}</span></td>
-        <td><span class="badge" style="background:var(--surface-alt);color:var(--text-secondary);font-size:11px">${l.action}</span></td>
-        <td class="fs-12">${l.entity_type}</td>
-        <td class="fs-11" style="color:var(--primary)">${l.entity_id}</td>
-        <td class="fs-11 text-secondary" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
-            title="${(l.new_value||'').replace(/"/g,'&quot;')}">${(l.new_value||l.notes||'').slice(0,60)}</td>
-      </tr>`).join('') || '<tr><td colspan="7" class="text-center text-muted" style="padding:24px">ไม่มีข้อมูล</td></tr>';
+    document.getElementById('audit-tbody').innerHTML = logs.map(l => {
+      const icon  = AUDIT_ICON[l.action] || '📋';
+      const label = AUDIT_TH[l.action]   || l.action;
+      const actor = (l.actor_email||'').split('@')[0] || 'ระบบ';
+      const roleBg = l.actor_role==='IT_MANAGER'?'#fce8e6':l.actor_role==='IT_STAFF'?'#fff3e0':'#e8f0fe';
+      const roleColor = l.actor_role==='IT_MANAGER'?'#c62828':l.actor_role==='IT_STAFF'?'#e65100':'#1565c0';
+      return `<tr>
+        <td class="fs-11 text-muted" style="white-space:nowrap">${formatDate(l.timestamp)}</td>
+        <td class="fs-12" title="${l.actor_email}">${actor}</td>
+        <td><span style="background:${roleBg};color:${roleColor};font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600">${l.actor_role||'—'}</span></td>
+        <td style="white-space:nowrap">${icon} <span class="fs-12">${label}</span></td>
+        <td class="fs-11" style="color:var(--text-secondary)">${parseAuditDetail(l.action, l.new_value)}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="5" class="text-center text-muted" style="padding:24px">ไม่มีข้อมูล</td></tr>';
   }
 
   function filterAudit() {
     const kw     = document.getElementById('audit-search').value.toLowerCase();
     const action = document.getElementById('audit-action-filter').value;
-    renderAudit(allAudit.filter(l=>{
-      if (action && l.action!==action) return false;
+    const df     = document.getElementById('audit-date-from').value;
+    const dt     = document.getElementById('audit-date-to').value;
+    renderAudit(allAudit.filter(l => {
+      if (action && l.action !== action) return false;
       if (kw && !JSON.stringify(l).toLowerCase().includes(kw)) return false;
+      if (df && new Date(l.timestamp) < new Date(df)) return false;
+      if (dt && new Date(l.timestamp) > new Date(dt + 'T23:59:59')) return false;
       return true;
     }));
+  }
+
+  function clearAuditFilters() {
+    ['audit-search','audit-action-filter','audit-date-from','audit-date-to'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    renderAudit(allAudit);
+  }
+
+  function exportAuditExcel() {
+    const kw     = document.getElementById('audit-search').value.toLowerCase();
+    const action = document.getElementById('audit-action-filter').value;
+    const df     = document.getElementById('audit-date-from').value;
+    const dt     = document.getElementById('audit-date-to').value;
+    const filtered = allAudit.filter(l => {
+      if (action && l.action !== action) return false;
+      if (kw && !JSON.stringify(l).toLowerCase().includes(kw)) return false;
+      if (df && new Date(l.timestamp) < new Date(df)) return false;
+      if (dt && new Date(l.timestamp) > new Date(dt + 'T23:59:59')) return false;
+      return true;
+    });
+    const header = ['วันที่/เวลา','ผู้ดำเนินการ','Email','Role','การดำเนินการ (Code)','การดำเนินการ (ไทย)','Entity','ID','รายละเอียด'];
+    const rows = filtered.map(l => [
+      l.timestamp, (l.actor_email||'').split('@')[0], l.actor_email||'',
+      l.actor_role||'', l.action||'', AUDIT_TH[l.action]||l.action||'',
+      l.entity_type||'', l.entity_id||'', (l.new_value||l.notes||'').replace(/"/g,'""').slice(0,200)
+    ]);
+    const csv = '﻿' + [header, ...rows].map(r => r.map(c => '"'+String(c)+'"').join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+    a.download = 'audit_log_' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click();
+    showToast('Export สำเร็จ ' + filtered.length + ' รายการ', 'success');
   }
 
   async function loadMoreAudit() {
