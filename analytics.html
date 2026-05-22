@@ -290,11 +290,18 @@
     try {
       const [aRes, tRes, kbRes] = await Promise.all([
         API.get('analytics'),
-        API.get('tickets'),
+        isITStaff() ? API.get('tickets') : API.get('tickets/my'),
         API.get('kb')
       ]);
-      analyticsData = aRes.success ? aRes.data : {};
-      allTickets    = tRes.success  ? tRes.data  : [];
+
+      if (!aRes.success) {
+        showToast('ไม่มีสิทธิ์ดู Analytics หรือเกิดข้อผิดพลาดจาก Server', 'error');
+        console.error('analytics error:', aRes);
+        return;
+      }
+
+      analyticsData = aRes.data || {};
+      allTickets    = tRes.success ? (tRes.data || []) : [];
 
       const df = document.getElementById('date-from').value;
       const dt = document.getElementById('date-to').value;
@@ -303,14 +310,15 @@
         return (!df || d >= new Date(df)) && (!dt || d <= new Date(dt + 'T23:59'));
       });
 
-      renderOverview(filtered, analyticsData);
-      renderSLASection(filtered);
-      renderTeamSection(filtered);
-      renderAISection(analyticsData, kbRes.data || []);
-      renderExecutiveSection(filtered, analyticsData);
+      try { renderOverview(filtered, analyticsData); } catch(e) { console.error('renderOverview error:', e); }
+      try { renderSLASection(filtered); }             catch(e) { console.error('renderSLASection error:', e); }
+      try { renderTeamSection(filtered); }            catch(e) { console.error('renderTeamSection error:', e); }
+      try { renderAISection(analyticsData, kbRes.success ? (kbRes.data || []) : []); } catch(e) { console.error('renderAISection error:', e); }
+      try { await renderExecutiveSection(filtered, analyticsData); } catch(e) { console.error('renderExecutiveSection error:', e); }
+
     } catch(e) {
-      showToast('ไม่สามารถโหลดข้อมูล Analytics ได้', 'error');
-      console.error(e);
+      showToast('ไม่สามารถโหลดข้อมูล Analytics ได้ กรุณาลองใหม่', 'error');
+      console.error('loadAnalytics error:', e);
     } finally { hideLoader(); }
   }
 
