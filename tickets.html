@@ -63,40 +63,69 @@
 
     <div class="page-content">
 
-      <!-- Filter Bar -->
-      <div class="filter-bar" id="filter-bar">
-        <input type="text" class="form-control search-input" id="search-input" placeholder="🔍 ค้นหา Ticket ID, ชื่อ, ผู้แจ้ง..." oninput="applyFilters()">
-        <select class="form-control" id="filter-status" onchange="applyFilters()">
-          <option value="">ทุกสถานะ</option>
-          <option>New Requests</option>
-          <option>Working on it</option>
-          <option>Done</option>
-          <option>Reopened</option>
-          <option>SLA Risk</option>
-          <option>Over SLA</option>
-        </select>
-        <select class="form-control" id="filter-priority" onchange="applyFilters()">
-          <option value="">ทุกความเร่งด่วน</option>
-          <option>Urgent</option>
-          <option>Normal</option>
-          <option>Low</option>
-        </select>
-        <select class="form-control" id="filter-type" onchange="applyFilters()">
-          <option value="">ทุกประเภท</option>
-          <option>Hardware</option>
-          <option>Software</option>
-          <option>Server/Network</option>
-          <option>Account &amp; Access Management</option>
-          <option>Backup / Recovery</option>
-          <option>Fixed Assets</option>
-          <option>IT Equipment / Consultation</option>
-          <option>MA Renewal</option>
-        </select>
-        <input type="date" class="form-control" id="filter-date-from" onchange="applyFilters()" title="วันที่เริ่มต้น">
-        <input type="date" class="form-control" id="filter-date-to"   onchange="applyFilters()" title="วันที่สิ้นสุด">
-        <button class="btn btn-secondary btn-sm" onclick="clearFilters()">✖ ล้าง</button>
-        <button class="btn btn-secondary btn-sm" onclick="exportToCSV()">⬇ Export</button>
+      <!-- Filter Bar — Compact Style -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+        <div style="flex:1;min-width:220px;position:relative">
+          <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:15px">🔍</span>
+          <input type="text" class="form-control" id="search-input" placeholder="ค้นหา Ticket ID, ชื่อ, ผู้แจ้ง..." oninput="applyFilters()" style="padding-left:34px">
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="toggleFilterPanel()" id="filter-toggle-btn" style="display:flex;align-items:center;gap:6px;white-space:nowrap">
+          ⚙ กรอง <span id="filter-badge" style="display:none;background:#1a73e8;color:white;border-radius:10px;padding:1px 7px;font-size:11px">0</span>
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="exportToCSV()" style="white-space:nowrap">⬇ Export</button>
         <span class="text-muted fs-12" id="filter-count"></span>
+      </div>
+
+      <!-- Filter Dropdown Panel -->
+      <div id="filter-panel" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+          <div>
+            <div class="form-label" style="font-size:11px;margin-bottom:4px">สถานะ</div>
+            <select class="form-control" id="filter-status" onchange="applyFilters()">
+              <option value="">ทุกสถานะ</option>
+              <option>New Requests</option>
+              <option>Working on it</option>
+              <option>Done</option>
+              <option>Reopened</option>
+              <option>SLA Risk</option>
+              <option>Over SLA</option>
+            </select>
+          </div>
+          <div>
+            <div class="form-label" style="font-size:11px;margin-bottom:4px">ความเร่งด่วน</div>
+            <select class="form-control" id="filter-priority" onchange="applyFilters()">
+              <option value="">ทุกความเร่งด่วน</option>
+              <option>Urgent</option>
+              <option>Normal</option>
+              <option>Low</option>
+            </select>
+          </div>
+          <div>
+            <div class="form-label" style="font-size:11px;margin-bottom:4px">ประเภท Ticket</div>
+            <select class="form-control" id="filter-type" onchange="applyFilters()">
+              <option value="">ทุกประเภท</option>
+              <option>Hardware</option>
+              <option>Software</option>
+              <option>Server/Network</option>
+              <option>Account &amp; Access Management</option>
+              <option>Backup / Recovery</option>
+              <option>Fixed Assets</option>
+              <option>IT Equipment / Consultation</option>
+              <option>MA Renewal</option>
+            </select>
+          </div>
+          <div>
+            <div class="form-label" style="font-size:11px;margin-bottom:4px">วันที่สร้าง (เริ่มต้น)</div>
+            <input type="date" class="form-control" id="filter-date-from" onchange="applyFilters()">
+          </div>
+          <div>
+            <div class="form-label" style="font-size:11px;margin-bottom:4px">วันที่สร้าง (สิ้นสุด)</div>
+            <input type="date" class="form-control" id="filter-date-to" onchange="applyFilters()">
+          </div>
+        </div>
+        <div style="margin-top:12px;display:flex;justify-content:flex-end">
+          <button class="btn btn-secondary btn-sm" onclick="clearFilters()">✖ ล้างทั้งหมด</button>
+        </div>
       </div>
 
       <!-- Tickets Table -->
@@ -392,6 +421,7 @@
 
   // ── Filters ─────────────────────────────────────────────────
   function applyFilters() {
+    updateFilterBadge();
     const kw   = document.getElementById('search-input').value.toLowerCase();
     const st   = document.getElementById('filter-status').value;
     const pr   = document.getElementById('filter-priority').value;
@@ -410,9 +440,23 @@
     renderTable(result);
   }
 
+  function toggleFilterPanel() {
+    const panel = document.getElementById('filter-panel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  }
+
+  function updateFilterBadge() {
+    const active = ['filter-status','filter-priority','filter-type','filter-date-from','filter-date-to']
+      .filter(id => document.getElementById(id).value).length;
+    const badge = document.getElementById('filter-badge');
+    if (active > 0) { badge.style.display = 'inline'; badge.textContent = active; }
+    else badge.style.display = 'none';
+  }
+
   function clearFilters() {
     ['search-input','filter-status','filter-priority','filter-type','filter-date-from','filter-date-to']
       .forEach(id => document.getElementById(id).value = '');
+    updateFilterBadge();
     renderTable(allTickets);
   }
 
@@ -620,15 +664,72 @@
     container.scrollTop = container.scrollHeight;
   }
 
+  const AUDIT_ACTION_TH = {
+    CREATE_TICKET:      'เปิด Ticket ใหม่',
+    UPDATE_TICKET:      'แก้ไขข้อมูล Ticket',
+    UPDATE_STATUS:      'เปลี่ยนสถานะ',
+    ASSIGN_TICKET:      'มอบหมายงาน',
+    CLOSE_TICKET:       'ปิด Ticket',
+    REOPEN_TICKET:      'เปิด Ticket ใหม่อีกครั้ง',
+    DELETE_TICKET:      'ลบ Ticket',
+    ADD_RESOLUTION:     'เพิ่มวิธีแก้ไข',
+    SATISFACTION_SCORE: 'ให้คะแนนความพึงพอใจ',
+    AI_RESPONSE:        'AI ตอบคำถาม',
+    FAQ_MATCH:          'ตอบจาก FAQ',
+    GEMINI_CALL:        'เรียกใช้ AI',
+    KB_APPROVED:        'อนุมัติเข้า Knowledge Base',
+    CREATE_USER:        'สร้างผู้ใช้งานใหม่',
+    UPDATE_USER:        'แก้ไขข้อมูลผู้ใช้',
+    UPDATE_ROLE:        'เปลี่ยนสิทธิ์ผู้ใช้',
+    USER_LOGIN:         'เข้าสู่ระบบ',
+    SLA_UPDATE:         'อัปเดต SLA',
+    SLA_BREACH:         'SLA เกินกำหนด',
+    CONFIG_UPDATE:      'แก้ไขการตั้งค่าระบบ',
+    FAQ_CREATED:        'สร้าง FAQ ใหม่',
+    FAQ_UPDATED:        'แก้ไข FAQ'
+  };
+
+  const AUDIT_ACTION_ICON = {
+    CREATE_TICKET:      '🎫', UPDATE_TICKET: '✏️', UPDATE_STATUS: '🔄',
+    ASSIGN_TICKET:      '👤', CLOSE_TICKET:  '✅', REOPEN_TICKET: '🔁',
+    ADD_RESOLUTION:     '💡', SATISFACTION_SCORE: '⭐', SLA_BREACH: '🚨',
+    UPDATE_ROLE:        '🔑', CONFIG_UPDATE: '⚙️', FAQ_CREATED: '❓'
+  };
+
+  function formatAuditDetail(action, newValue) {
+    if (!newValue) return '';
+    try {
+      const obj = typeof newValue === 'string' ? JSON.parse(newValue) : newValue;
+      if (typeof obj !== 'object' || Array.isArray(obj)) return '';
+      const FIELD_TH = {
+        status: 'สถานะ', resolution: 'วิธีแก้ไข', root_cause: 'สาเหตุ',
+        assigned_to: 'มอบหมายให้', assigned_name: 'ชื่อผู้รับผิดชอบ',
+        priority: 'ความเร่งด่วน', ticket_type: 'ประเภท', role: 'สิทธิ์',
+        score: 'คะแนน', value: 'ค่า', title: 'ชื่อปัญหา', description: 'รายละเอียด'
+      };
+      const rows = Object.entries(obj)
+        .filter(([k,v]) => v !== '' && v !== null && v !== undefined && !['ticket_id','log_id','created_at','updated_at','attachment_urls','similar_tickets','ai_approved_learning'].includes(k))
+        .slice(0, 5)
+        .map(([k,v]) => `<span style="color:var(--text-muted);font-size:11px">${FIELD_TH[k]||k}:</span> <span style="font-size:12px">${String(v).substring(0,80)}</span>`)
+        .join('<br>');
+      return rows ? `<div style="margin-top:6px;padding:8px 10px;background:var(--surface-alt);border-radius:6px;line-height:1.8">${rows}</div>` : '';
+    } catch(e) { return ''; }
+  }
+
   async function loadAuditLog(ticketId) {
     const res = await API.get('audit', { entity_type: 'TICKET', entity_id: ticketId });
     const logs = res.success ? res.data : [];
-    document.getElementById('detail-audit-log').innerHTML = logs.map(l => `
-      <div class="timeline-item">
-        <div class="timeline-time">${formatDate(l.timestamp)} — ${l.actor_email}</div>
-        <div class="timeline-title">${l.action}</div>
-        ${l.new_value ? `<div class="timeline-body">${l.new_value}</div>` : ''}
-      </div>`).join('') || '<div class="empty-state"><p>ยังไม่มีประวัติ</p></div>';
+    document.getElementById('detail-audit-log').innerHTML = logs.map(l => {
+      const icon   = AUDIT_ACTION_ICON[l.action] || '📋';
+      const label  = AUDIT_ACTION_TH[l.action]   || l.action;
+      const detail = formatAuditDetail(l.action, l.new_value);
+      const actor  = l.actor_email ? l.actor_email.split('@')[0] : 'ระบบ';
+      return `<div class="timeline-item">
+        <div class="timeline-time">${formatDate(l.timestamp)}</div>
+        <div class="timeline-title">${icon} ${label} <span style="font-size:11px;color:var(--text-muted);font-weight:400">โดย ${actor}</span></div>
+        ${detail}
+      </div>`;
+    }).join('') || '<div class="empty-state"><p>ยังไม่มีประวัติ</p></div>';
   }
 
   function loadSimilar(ticket) {
