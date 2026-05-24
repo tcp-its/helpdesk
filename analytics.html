@@ -118,10 +118,10 @@
       <div class="export-bar">
         <label class="fs-13 fw-600">ช่วงเวลา:</label>
         <input type="text" class="form-control" id="date-from" placeholder="DD/MM/YYYY" maxlength="10"
-               style="width:130px" oninput="formatDateInput(this)">
+               style="width:130px">
         <span class="text-muted">—</span>
         <input type="text" class="form-control" id="date-to" placeholder="DD/MM/YYYY" maxlength="10"
-               style="width:130px" oninput="formatDateInput(this)">
+               style="width:130px">
         <button class="btn btn-primary btn-sm"    onclick="loadAnalytics()">🔍 วิเคราะห์</button>
         <button class="btn btn-secondary btn-sm"  onclick="exportExcel()">📊 Export Excel</button>
         <button class="btn btn-secondary btn-sm"  onclick="exportPDF()">📄 Export PDF</button>
@@ -303,6 +303,43 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/th.js"></script>
 <script src="assets/js/app.js"></script>
 <script>
+  // ── Fallback Utilities (กรณี app.js เวอร์ชันเก่าไม่มีฟังก์ชันเหล่านี้) ──
+  if (typeof parseDDMMYYYY !== 'function') {
+    window.parseDDMMYYYY = function(str) {
+      if (!str || str.length < 8) return null;
+      const parts = str.split('/');
+      if (parts.length !== 3) return null;
+      const [d, m, y] = parts;
+      if (!d || !m || !y || y.length !== 4) return null;
+      const date = new Date(y + '-' + m.padStart(2,'0') + '-' + d.padStart(2,'0'));
+      return isNaN(date.getTime()) ? null : date;
+    };
+  }
+  if (typeof dateToDDMMYYYY !== 'function') {
+    window.dateToDDMMYYYY = function(date) {
+      if (!date) return '';
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return '';
+      return String(d.getDate()).padStart(2,'0') + '/' +
+             String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+    };
+  }
+  if (typeof formatDateInput !== 'function') {
+    window.formatDateInput = function(input) {
+      let v = input.value.replace(/\D/g,'').substring(0,8);
+      if (v.length >= 3) v = v.substring(0,2) + '/' + v.substring(2);
+      if (v.length >= 6) v = v.substring(0,5) + '/' + v.substring(5);
+      input.value = v;
+    };
+  }
+  if (typeof todayDDMMYYYY !== 'function') {
+    window.todayDDMMYYYY = function() {
+      const now = new Date();
+      return String(now.getDate()).padStart(2,'0') + '/' +
+             String(now.getMonth()+1).padStart(2,'0') + '/' + now.getFullYear();
+    };
+  }
+
   // ── Auth Guard ──────────────────────────────────────────────
   if (!loadStoredSession()) { location.href = 'index.html'; }
   const user = getCurrentUser();
