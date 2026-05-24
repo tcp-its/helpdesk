@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/main.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <style>
     .analytics-tabs { display:flex; gap:0; border-bottom:2px solid var(--border); margin-bottom:24px; overflow-x:auto; }
@@ -27,6 +28,25 @@
                   border-radius:10px; padding:16px; margin-bottom:16px; }
     [data-theme="dark"] .ai-insight { background:linear-gradient(135deg,#1a2e4a,#162038); border-color:#2a4a7a; }
     .export-bar { display:flex; gap:10px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
+
+    /* ── Flatpickr Overrides ───────────────────────────────── */
+    .flatpickr-input { cursor:pointer; }
+    .flatpickr-day.today { border-color:var(--primary) !important; color:var(--primary) !important; font-weight:700; }
+    .flatpickr-day.today:hover,
+    .flatpickr-day.today.selected { background:var(--primary) !important; color:#fff !important; border-color:var(--primary) !important; }
+    .flatpickr-day.selected,
+    .flatpickr-day.selected:hover { background:var(--primary) !important; border-color:var(--primary) !important; }
+    .flatpickr-months .flatpickr-month,
+    .flatpickr-current-month,
+    .flatpickr-weekdays { background:var(--primary) !important; }
+    .flatpickr-weekday { color:#fff !important; }
+    .flatpickr-current-month .flatpickr-monthDropdown-months,
+    .flatpickr-current-month input.cur-year { color:#fff !important; }
+    .numInputWrapper:hover { background:rgba(255,255,255,.1) !important; }
+    [data-theme="dark"] .flatpickr-calendar { background:var(--surface) !important; border-color:var(--border) !important; box-shadow:0 8px 24px rgba(0,0,0,.4); }
+    [data-theme="dark"] .flatpickr-day { color:var(--text-primary) !important; }
+    [data-theme="dark"] .flatpickr-day:hover { background:var(--surface-alt) !important; }
+    [data-theme="dark"] .flatpickr-day.flatpickr-disabled { color:var(--text-muted) !important; }
   </style>
 </head>
 <body>
@@ -255,6 +275,8 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/th.js"></script>
 <script src="assets/js/app.js"></script>
 <script>
   // ── Auth Guard ──────────────────────────────────────────────
@@ -269,6 +291,21 @@
     if (isManager()) document.getElementById('nav-admin').style.display = 'flex';
   }
 
+  // ── Flatpickr Date Pickers ──────────────────────────────────
+  let _fpFrom, _fpTo;
+  (function initDatePickers() {
+    const opts = {
+      dateFormat:          'd/m/Y',
+      locale:              'th',
+      allowInput:          true,
+      disableMobile:       false,
+      monthSelectorType:   'dropdown',
+      showMonths:          1
+    };
+    _fpFrom = flatpickr('#date-from', opts);
+    _fpTo   = flatpickr('#date-to',   opts);
+  })();
+
   google.charts.load('current', { packages: ['corechart','bar','gauge','table'] });
   google.charts.setOnLoadCallback(() => {
     setDefaultDates();
@@ -279,8 +316,10 @@
   function setDefaultDates() {
     const now  = new Date();
     const from = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-    document.getElementById('date-from').value = dateToDDMMYYYY(from);
-    document.getElementById('date-to').value   = dateToDDMMYYYY(now);
+    if (_fpFrom) { _fpFrom.setDate(from, true); }
+    else { document.getElementById('date-from').value = dateToDDMMYYYY(from); }
+    if (_fpTo)   { _fpTo.setDate(now, true); }
+    else { document.getElementById('date-to').value   = dateToDDMMYYYY(now); }
   }
 
   // ── Load All Analytics ──────────────────────────────────────
@@ -290,33 +329,50 @@
   async function loadAnalytics() {
     showLoader('กำลังวิเคราะห์ข้อมูล...');
     try {
-      const [aRes, tRes, kbRes] = await Promise.all([
+      // ── ใช้ allSettled แทน all เพื่อให้ 1 call fail ไม่กระทบส่วนอื่น ──
+      const [aSettled, tSettled, kbSettled] = await Promise.allSettled([
         API.get('analytics'),
         isITStaff() ? API.get('tickets') : API.get('tickets/my'),
         API.get('kb')
       ]);
 
+      const aRes  = aSettled.status  === 'fulfilled' ? aSettled.value  : { success: false };
+      const tRes  = tSettled.status  === 'fulfilled' ? tSettled.value  : { success: false };
+      const kbRes = kbSettled.status === 'fulfilled' ? kbSettled.value : { success: false };
+
+      // ── Log error รายอันเพื่อ debug ───────────────────────────
+      if (aSettled.status  === 'rejected') console.error('[analytics] API error:',  aSettled.reason);
+      if (tSettled.status  === 'rejected') console.error('[tickets]   API error:',  tSettled.reason);
+      if (kbSettled.status === 'rejected') console.error('[kb]        API error:',  kbSettled.reason);
+
       if (!aRes.success) {
         showToast('ไม่มีสิทธิ์ดู Analytics หรือเกิดข้อผิดพลาดจาก Server', 'error');
-        console.error('analytics error:', aRes);
+        console.error('analytics response:', aRes);
         return;
       }
 
       analyticsData = aRes.data || {};
       allTickets    = tRes.success ? (tRes.data || []) : [];
 
+      // ── Date filter พร้อม null/invalid-Date guard ─────────────
       const df = parseDDMMYYYY(document.getElementById('date-from').value);
       const dt = parseDDMMYYYY(document.getElementById('date-to').value);
+      const dtMax = (dt instanceof Date && !isNaN(dt)) ? dt.getTime() + 86399999 : null;
+      const dfMs  = (df instanceof Date && !isNaN(df)) ? df.getTime()            : null;
+
       const filtered = allTickets.filter(t => {
+        if (!t.created_at) return true;
         const d = new Date(t.created_at);
-        return (!df || d >= df) && (!dt || d <= new Date(dt.getTime() + 86399999));
+        if (isNaN(d.getTime())) return true;
+        const ms = d.getTime();
+        return (dfMs === null || ms >= dfMs) && (dtMax === null || ms <= dtMax);
       });
 
-      try { renderOverview(filtered, analyticsData); } catch(e) { console.error('renderOverview error:', e); }
-      try { renderSLASection(filtered); }             catch(e) { console.error('renderSLASection error:', e); }
-      try { renderTeamSection(filtered); }            catch(e) { console.error('renderTeamSection error:', e); }
+      try { renderOverview(filtered, analyticsData); }                              catch(e) { console.error('renderOverview error:', e); }
+      try { renderSLASection(filtered); }                                            catch(e) { console.error('renderSLASection error:', e); }
+      try { renderTeamSection(filtered); }                                           catch(e) { console.error('renderTeamSection error:', e); }
       try { renderAISection(analyticsData, kbRes.success ? (kbRes.data || []) : []); } catch(e) { console.error('renderAISection error:', e); }
-      try { await renderExecutiveSection(filtered, analyticsData); } catch(e) { console.error('renderExecutiveSection error:', e); }
+      try { await renderExecutiveSection(filtered, analyticsData); }                catch(e) { console.error('renderExecutiveSection error:', e); }
 
     } catch(e) {
       showToast('ไม่สามารถโหลดข้อมูล Analytics ได้ กรุณาลองใหม่', 'error');
