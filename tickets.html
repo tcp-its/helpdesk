@@ -349,6 +349,14 @@
             <div class="score-stars" id="score-stars"></div>
             <div class="mt-8 text-muted fs-12" id="score-display"></div>
           </div>
+
+          <!-- [Survey Reminder] ปุ่มส่ง Survey ซ้ำ — แสดงเมื่อ Done + ยังไม่มีคะแนน + resend < 1 -->
+          <div id="resend-survey-section" style="display:none;margin-top:12px">
+            <button class="btn btn-warning btn-block" onclick="resendSurvey()" id="resend-survey-btn">
+              📨 ส่ง Survey ซ้ำ
+            </button>
+            <div class="text-muted fs-11 mt-4" style="text-align:center">ส่งได้อีก 1 ครั้ง — user ยังไม่ให้คะแนน</div>
+          </div>
         </div>
       </div>
     </div>
@@ -420,11 +428,11 @@
     try {
       const res = await API.get(isITStaff() ? 'tickets' : 'tickets/my');
       allTickets = res.success ? res.data : [];
-      updateStatusTabs(allTickets);
       renderTable(allTickets);
     } catch(e) {
       showToast('ไม่สามารถโหลด Ticket ได้', 'error');
     }
+    try { updateStatusTabs(allTickets); } catch(e) { console.error('updateStatusTabs error:', e); }
   }
 
   // ── Render Table ────────────────────────────────────────────
@@ -699,10 +707,19 @@
         document.getElementById('reopen-ticket-btn').style.display  = 'none';
       }
 
-      // Satisfaction
+      // Satisfaction score (มีคะแนนแล้ว)
       if (t.satisfaction_score > 0) {
         document.getElementById('satisfaction-section').style.display = 'block';
         document.getElementById('score-display').textContent = '⭐'.repeat(t.satisfaction_score) + ' (' + t.satisfaction_score + '/5)';
+      }
+
+      // [Survey Reminder] แสดงปุ่ม Resend Survey เมื่อ Done + ยังไม่มีคะแนน + ยังส่งซ้ำได้
+      const resendSection = document.getElementById('resend-survey-section');
+      const resendCount   = parseInt(t.survey_resend_count || 0);
+      if (t.status === 'Done' && !(t.satisfaction_score > 0) && resendCount < 1 && t.requester_line_id) {
+        resendSection.style.display = 'block';
+      } else {
+        resendSection.style.display = 'none';
       }
     } else {
       itPanel.style.display = 'none';
@@ -896,6 +913,32 @@
     const res = await API.post('ticket/reopen', { ticket_id: currentTicket.ticket_id });
     if (res.success) { showToast('เปิด Ticket ใหม่แล้ว', 'success'); await loadTickets(); closeModal('ticket-detail-modal'); }
     else showToast(res.data?.error || 'เกิดข้อผิดพลาด', 'error');
+  }
+
+  // ── Resend Survey (IT Staff) ─────────────────────────────────
+  // [Survey Reminder] IT Staff กดส่ง survey ซ้ำ 1 ครั้ง
+  async function resendSurvey() {
+    if (!confirm('ส่ง Survey ให้ผู้แจ้งอีกครั้งหรือไม่?\n(สามารถทำได้เพียง 1 ครั้งเท่านั้น)')) return;
+    const btn = document.getElementById('resend-survey-btn');
+    btn.disabled    = true;
+    btn.textContent = '⏳ กำลังส่ง...';
+    try {
+      const res = await API.post('ticket/resend-survey', { ticket_id: currentTicket.ticket_id });
+      if (res.success) {
+        showToast('📨 ส่ง Survey ซ้ำสำเร็จแล้วครับ', 'success', 4000);
+        // ซ่อนปุ่มทันที และอัปเดต local state
+        document.getElementById('resend-survey-section').style.display = 'none';
+        _applyLocalUpdate({ survey_resend_count: 1 });
+      } else {
+        showToast(res.data?.error || 'เกิดข้อผิดพลาด', 'error');
+        btn.disabled    = false;
+        btn.textContent = '📨 ส่ง Survey ซ้ำ';
+      }
+    } catch(e) {
+      showToast('เกิดข้อผิดพลาด', 'error');
+      btn.disabled    = false;
+      btn.textContent = '📨 ส่ง Survey ซ้ำ';
+    }
   }
 
   // ── Score Modal ──────────────────────────────────────────────
