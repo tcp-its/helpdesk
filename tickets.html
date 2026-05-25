@@ -76,6 +76,9 @@
         <span class="text-muted fs-12" id="filter-count"></span>
       </div>
 
+      <!-- Status Quick Tabs -->
+      <div id="status-tabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
+
       <!-- Filter Dropdown Panel -->
       <div id="filter-panel" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px">
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
@@ -417,6 +420,7 @@
     try {
       const res = await API.get(isITStaff() ? 'tickets' : 'tickets/my');
       allTickets = res.success ? res.data : [];
+      updateStatusTabs(allTickets);
       renderTable(allTickets);
     } catch(e) {
       showToast('ไม่สามารถโหลด Ticket ได้', 'error');
@@ -451,6 +455,43 @@
 
   // ── Filters ─────────────────────────────────────────────────
   // formatDateInput() และ parseDDMMYYYY() ย้ายไปอยู่ใน app.js แล้ว
+
+  // ── Status Quick Tabs ────────────────────────────────────────
+  const STATUS_TABS = [
+    { label: 'ทั้งหมด',    value: '',            color: '#444444' },
+    { label: 'New',        value: 'New Requests', color: '#1a73e8' },
+    { label: 'Working',    value: 'Working on it',color: '#f5a623' },
+    { label: 'Done',       value: 'Done',         color: '#34a853' },
+    { label: 'SLA Risk',   value: 'SLA Risk',     color: '#ff6d00' },
+    { label: 'Over SLA',   value: 'Over SLA',     color: '#ea4335' }
+  ];
+
+  function updateStatusTabs(tickets) {
+    const container = document.getElementById('status-tabs');
+    if (!container) return;
+    const currentVal = document.getElementById('filter-status').value;
+    const counts = {};
+    tickets.forEach(t => { counts[t.status] = (counts[t.status] || 0) + 1; });
+    container.innerHTML = STATUS_TABS.map(tab => {
+      const count = tab.value === '' ? tickets.length : (counts[tab.value] || 0);
+      const isActive = currentVal === tab.value;
+      return `<button onclick="setStatusTab('${tab.value}')"
+        style="padding:5px 12px;border-radius:20px;border:2px solid ${tab.color};
+               background:${isActive ? tab.color : 'transparent'};
+               color:${isActive ? '#fff' : tab.color};
+               font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;
+               transition:all .15s">
+        ${tab.label} <span style="background:${isActive?'rgba(255,255,255,0.3)':'rgba(0,0,0,0.08)'};
+          border-radius:10px;padding:1px 6px;font-size:11px">${count}</span>
+      </button>`;
+    }).join('');
+  }
+
+  function setStatusTab(value) {
+    document.getElementById('filter-status').value = value;
+    applyFilters();
+    updateStatusTabs(allTickets);
+  }
 
   function applyFilters() {
     updateFilterBadge();
@@ -489,6 +530,7 @@
     ['search-input','filter-status','filter-priority','filter-type','filter-date-from','filter-date-to']
       .forEach(id => document.getElementById(id).value = '');
     updateFilterBadge();
+    updateStatusTabs(allTickets);
     renderTable(allTickets);
   }
 
