@@ -698,16 +698,23 @@
     // Description
     document.getElementById('detail-description').textContent = t.description;
 
-    // Resolution
+    // Resolution — [Fix Bug] ต้องมี else เพื่อ reset DOM เมื่อ ticket ใหม่ไม่มี resolution
+    // ถ้าไม่มี else: resolution ของ ticket ก่อนหน้าจะค้างอยู่ใน DOM และแสดงใน ticket อื่นทุกตัว
     if (t.resolution) {
       document.getElementById('resolution-section').style.display = 'block';
       document.getElementById('detail-resolution').textContent = t.resolution;
+    } else {
+      document.getElementById('resolution-section').style.display = 'none';
+      document.getElementById('detail-resolution').textContent = '';
     }
 
-    // AI suggestion
+    // AI suggestion — [Fix Bug] reset เช่นเดียวกัน
     if (t.ai_suggested_solution) {
       document.getElementById('ai-suggestion-section').style.display = 'block';
       document.getElementById('detail-ai-suggestion').textContent = t.ai_suggested_solution;
+    } else {
+      document.getElementById('ai-suggestion-section').style.display = 'none';
+      document.getElementById('detail-ai-suggestion').textContent = '';
     }
 
     // Attachments — [Feat] แสดงรูปภาพจาก Google Drive
