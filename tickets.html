@@ -24,6 +24,10 @@
     .similar-ticket:hover { background:var(--border); }
     .score-stars { display:flex;gap:4px;font-size:24px;cursor:pointer; }
     .score-stars span:hover, .score-stars span.active { color:#f5a623; }
+    /* [Feat] Completion Image Upload */
+    .completion-drop-zone { border:2px dashed var(--border);border-radius:8px;padding:14px 10px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s; }
+    .completion-drop-zone:hover { border-color:var(--primary);background:rgba(26,115,232,.04); }
+    .completion-drop-zone.dragover { border-color:var(--primary);background:rgba(26,115,232,.08); }
   </style>
 </head>
 <body>
@@ -285,8 +289,14 @@
               </div>
             </div>
             <div id="attachments-section" style="display:none">
-              <div class="form-label text-muted">ไฟล์แนบ</div>
+              <div class="form-label text-muted">ไฟล์แนบจากผู้แจ้ง</div>
               <div class="attachment-list" id="detail-attachments"></div>
+            </div>
+
+            <!-- [Feat] รูปยืนยันงาน — IT Staff อัปโหลด -->
+            <div id="completion-images-section" style="display:none">
+              <div class="form-label text-muted" style="margin-top:12px">📸 รูปยืนยันงาน (IT Staff)</div>
+              <div class="attachment-list" id="detail-completion-images"></div>
             </div>
           </div>
 
@@ -360,6 +370,29 @@
               📨 ส่ง Survey ซ้ำ
             </button>
             <div class="text-muted fs-11 mt-4" style="text-align:center">ส่งได้อีก 1 ครั้ง — user ยังไม่ให้คะแนน</div>
+          </div>
+
+          <!-- [Feat] อัปโหลดรูปยืนยันงาน (IT Staff only) -->
+          <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">📸 รูปยืนยันงาน</label>
+            <div
+              class="completion-drop-zone"
+              id="completion-drop-zone"
+              onclick="document.getElementById('completion-file-input').click()"
+              ondragover="event.preventDefault();this.classList.add('dragover')"
+              ondragleave="this.classList.remove('dragover')"
+              ondrop="this.classList.remove('dragover');handleCompletionImageDrop(event)"
+            >
+              <div style="font-size:22px;line-height:1">📷</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:4px">คลิกหรือลากรูปมาวางที่นี่</div>
+              <div style="font-size:11px;color:var(--text-muted)">PNG / JPG • สูงสุด 5 MB</div>
+            </div>
+            <input type="file" id="completion-file-input" accept="image/*" style="display:none"
+              onchange="handleCompletionImageSelect(event)">
+            <div id="completion-upload-status" style="display:none;margin-top:8px;font-size:12px;color:var(--primary);text-align:center">
+              ⏳ กำลังอัปโหลด...
+            </div>
           </div>
         </div>
       </div>
@@ -677,27 +710,66 @@
       document.getElementById('detail-ai-suggestion').textContent = t.ai_suggested_solution;
     }
 
-    // Attachments — [Feat] แสดงรูปภาพจาก Google Drive แทน text link
+    // Attachments — [Feat] แสดงรูปภาพจาก Google Drive
+    // ใช้ Thumbnail API (drive.google.com/thumbnail?id=...) แทน uc?export=view
+    // เพื่อแก้ปัญหา CORS block เมื่อโหลดบน GitHub Pages
     const urls = typeof t.attachment_urls === 'string'
       ? JSON.parse(t.attachment_urls || '[]')
       : (t.attachment_urls || []);
-    const attachSection = document.getElementById('attachments-section');
-    const attachContainer = document.getElementById('detail-attachments');
+    const attachSection    = document.getElementById('attachments-section');
+    const attachContainer  = document.getElementById('detail-attachments');
+
+    function _driveThumbUrl(url) {
+      // แปลง https://drive.google.com/uc?export=view&id=FILE_ID
+      //    → https://drive.google.com/thumbnail?id=FILE_ID&sz=w400
+      const m = url.match(/[?&]id=([^&]+)/);
+      return m ? 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w400' : url;
+    }
+
     if (urls.length) {
       attachSection.style.display = 'block';
-      attachContainer.innerHTML = urls.map((u, i) => `
-        <a href="${u}" target="_blank" class="attachment-thumb-link" title="ดูรูปเต็ม">
-          <img
-            src="${u}"
-            alt="รูปแนบ ${i+1}"
-            class="attachment-thumb"
-            onerror="this.closest('a').innerHTML='<span class=\\'attachment-item\\'>📎 ไฟล์แนบ ${i+1}</span>'"
-          />
-          <div class="attachment-thumb-label">รูป ${i+1}</div>
-        </a>
-      `).join('');
+      attachContainer.innerHTML = urls.map((u, i) => {
+        const thumb = _driveThumbUrl(u);
+        return `
+          <a href="${u}" target="_blank" class="attachment-thumb-link" title="กดเพื่อดูรูปเต็ม">
+            <img
+              src="${thumb}"
+              alt="รูปแนบ ${i+1}"
+              class="attachment-thumb"
+              onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+            />
+            <span class="attachment-item" style="display:none">📎 ไฟล์แนบ ${i+1}</span>
+            <div class="attachment-thumb-label">รูป ${i+1}</div>
+          </a>`;
+      }).join('');
     } else {
       attachSection.style.display = 'none';
+    }
+
+    // [Feat] รูปยืนยันงาน (IT Staff)
+    const compUrls = typeof t.completion_image_urls === 'string'
+      ? JSON.parse(t.completion_image_urls || '[]')
+      : (t.completion_image_urls || []);
+    const compSection   = document.getElementById('completion-images-section');
+    const compContainer = document.getElementById('detail-completion-images');
+    if (compUrls.length) {
+      compSection.style.display = 'block';
+      compContainer.innerHTML = compUrls.map((u, i) => {
+        const thumb = _driveThumbUrl(u);
+        return `
+          <a href="${u}" target="_blank" class="attachment-thumb-link" title="กดเพื่อดูรูปเต็ม">
+            <img
+              src="${thumb}"
+              alt="รูปยืนยัน ${i+1}"
+              class="attachment-thumb"
+              onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+            />
+            <span class="attachment-item" style="display:none">📸 รูปยืนยัน ${i+1}</span>
+            <div class="attachment-thumb-label">ยืนยัน ${i+1}</div>
+          </a>`;
+      }).join('');
+    } else {
+      compSection.style.display = 'none';
     }
 
     // IT Panel
@@ -957,6 +1029,71 @@
       btn.disabled    = false;
       btn.textContent = '📨 ส่ง Survey ซ้ำ';
     }
+  }
+
+  // ── Completion Image Upload (IT Staff) ──────────────────────
+  // [Feat] IT Staff อัปโหลดรูปยืนยันงาน → Google Drive → แสดงใน ticket detail
+
+  function handleCompletionImageSelect(event) {
+    const file = event.target.files[0];
+    event.target.value = ''; // reset so same file can be re-selected
+    if (file) _uploadCompletionImage(file);
+  }
+
+  function handleCompletionImageDrop(event) {
+    event.preventDefault();
+    const file = event.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) _uploadCompletionImage(file);
+    else showToast('กรุณาเลือกไฟล์รูปภาพเท่านั้น (PNG/JPG)', 'warning');
+  }
+
+  async function _uploadCompletionImage(file) {
+    const MAX_BYTES = 5 * 1024 * 1024;
+    if (file.size > MAX_BYTES) {
+      showToast('ไฟล์ใหญ่เกิน 5 MB กรุณาลดขนาดรูปก่อน', 'error');
+      return;
+    }
+
+    const statusEl = document.getElementById('completion-upload-status');
+    const zoneEl   = document.getElementById('completion-drop-zone');
+    statusEl.style.display = 'block';
+    zoneEl.style.pointerEvents = 'none';
+    zoneEl.style.opacity = '0.6';
+
+    try {
+      // อ่านไฟล์เป็น base64
+      const dataUrl   = await _fileToBase64(file);
+      const imageData = dataUrl.split(',')[1]; // ตัด "data:image/jpeg;base64," ออก
+
+      const res = await API.post('ticket/upload-completion-image', {
+        ticket_id:  currentTicket.ticket_id,
+        image_data: imageData,
+        mime_type:  file.type
+      });
+
+      if (!res.success) throw new Error(res.data?.error || 'อัปโหลดไม่สำเร็จ');
+
+      showToast('📸 อัปโหลดรูปยืนยันงานสำเร็จ', 'success');
+      // รีเฟรช ticket detail เพื่อแสดงรูปใหม่
+      await openTicketDetail(currentTicket.ticket_id);
+
+    } catch (e) {
+      console.error('[uploadCompletionImage]', e);
+      showToast('อัปโหลดไม่สำเร็จ: ' + (e.message || 'กรุณาลองใหม่'), 'error');
+    } finally {
+      statusEl.style.display = 'none';
+      zoneEl.style.pointerEvents = '';
+      zoneEl.style.opacity = '';
+    }
+  }
+
+  function _fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('อ่านไฟล์ไม่ได้'));
+      reader.readAsDataURL(file);
+    });
   }
 
   // ── Score Modal ──────────────────────────────────────────────
