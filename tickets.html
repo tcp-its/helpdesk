@@ -302,6 +302,13 @@
 
           <div id="tab-chat" style="display:none">
             <div class="chat-messages" id="detail-chat-log"></div>
+            <div id="chat-line-hint" style="display:none;margin-top:12px;padding:12px 14px;background:var(--surface-alt);border-radius:8px;border:1px solid var(--border);text-align:center">
+              <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px">ต้องการส่งข้อความถึงทีม IT เพิ่มเติม?</div>
+              <a id="chat-line-link" href="https://line.me/R/ti/p/@tcpsmartitdesk" target="_blank"
+                style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#06C755;color:#fff;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none">
+                <span>💬</span> ส่งข้อความผ่าน LINE OA
+              </a>
+            </div>
           </div>
 
           <div id="tab-audit" style="display:none">
@@ -839,7 +846,12 @@
     document.querySelectorAll('#ticket-detail-modal .tab').forEach(t => t.classList.remove('active'));
     el.classList.add('active');
 
-    if (tab === 'chat' && currentTicket) loadChatLog(currentTicket.ticket_id);
+    if (tab === 'chat' && currentTicket) {
+      loadChatLog(currentTicket.ticket_id);
+      // Show LINE OA link for regular users so they can continue conversation
+      const hint = document.getElementById('chat-line-hint');
+      if (hint) hint.style.display = isITStaff() ? 'none' : 'block';
+    }
     if (tab === 'audit' && currentTicket) loadAuditLog(currentTicket.ticket_id);
     if (tab === 'similar' && currentTicket) loadSimilar(currentTicket);
   }

@@ -183,6 +183,9 @@
   if (!loadStoredSession()) { location.href = 'index.html'; }
   setupNav();
 
+  // ── Role Guard: Regular users redirect to tickets page ────
+  if (!isITStaff()) { location.href = 'tickets.html'; }
+
   function setupNav() {
     const user = getCurrentUser();
     if (!user) return;
