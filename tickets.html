@@ -324,6 +324,14 @@
         <div style="padding:20px" id="it-panel">
           <div style="font-size:13px;font-weight:700;margin-bottom:12px">⚙️ จัดการ Ticket</div>
 
+          <!-- [Feat] แก้ไข SLA Deadline — IT_MANAGER เท่านั้น -->
+          <div class="form-group" id="sla-deadline-manager-section" style="display:none;padding:12px;background:#fff3e0;border:1px solid #ffcc80;border-radius:8px;margin-bottom:16px">
+            <label class="form-label" style="color:#e65100">⏰ แก้ไข SLA Deadline (IT_MANAGER)</label>
+            <input type="datetime-local" class="form-control" id="detail-sla-deadline-input">
+            <button class="btn btn-warning btn-block mt-8" onclick="saveSLADeadline()">💾 บันทึก SLA Deadline ใหม่</button>
+            <div class="text-muted fs-11 mt-4">ใช้เมื่อขยาย/ปรับกรอบเวลาให้ ticket เป็นกรณีพิเศษ — บันทึกลง Audit Log</div>
+          </div>
+
           <!-- Status Update -->
           <div class="form-group">
             <label class="form-label">เปลี่ยนสถานะ</label>
@@ -790,6 +798,16 @@
     const itPanel = document.getElementById('it-panel');
     if (isITStaff()) {
       itPanel.style.display = 'block';
+
+      // [Feat] SLA Deadline override — IT_MANAGER only
+      const slaMgrSection = document.getElementById('sla-deadline-manager-section');
+      if (isManager()) {
+        slaMgrSection.style.display = 'block';
+        document.getElementById('detail-sla-deadline-input').value = toDatetimeLocalValue(t.sla_deadline);
+      } else {
+        slaMgrSection.style.display = 'none';
+      }
+
       const statusSel = document.getElementById('detail-status-select');
       statusSel.value = t.status;
 
@@ -836,6 +854,41 @@
             `<button class="btn btn-warning btn-sm" onclick="showScoreModal('${t.ticket_id}')">⭐ ให้คะแนน</button>`;
         }
       }
+    }
+  }
+
+  // [Feat] SLA Deadline override helpers — IT_MANAGER only
+  function toDatetimeLocalValue(dt) {
+    if (!dt) return '';
+    const d = new Date(dt);
+    if (isNaN(d.getTime())) return '';
+    const pad = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+           'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
+  async function saveSLADeadline() {
+    if (!currentTicket) return;
+    const raw = document.getElementById('detail-sla-deadline-input').value; // "YYYY-MM-DDTHH:mm"
+    if (!raw) { showToast('กรุณาเลือกวันเวลา', 'warning'); return; }
+    // Convert to the canonical "YYYY-MM-DD HH:mm:ss" format used everywhere
+    // else in the sheet, so it parses identically to existing sla_deadline values.
+    const formatted = raw.replace('T', ' ') + ':00';
+
+    showLoader('กำลังบันทึก SLA Deadline...');
+    try {
+      const res = await API.post('ticket/update', { ticket_id: currentTicket.ticket_id, sla_deadline: formatted });
+      if (res.success) {
+        showToast('บันทึก SLA Deadline ใหม่แล้ว', 'success');
+        await openTicketDetail(currentTicket.ticket_id); // refetch + re-render
+        await loadTickets();
+      } else {
+        showToast('เกิดข้อผิดพลาด: ' + (res.data?.error || ''), 'error');
+      }
+    } catch (e) {
+      showToast('เกิดข้อผิดพลาด: ' + (e.message || 'กรุณาลองใหม่'), 'error');
+    } finally {
+      hideLoader();
     }
   }
 
