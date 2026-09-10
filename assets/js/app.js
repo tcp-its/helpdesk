@@ -97,10 +97,19 @@ let _idToken  = null;
 let _user     = null;
 let _role     = null;
 
+// [Feat] Sliding session — the backend renews the session token (and its
+// real expiry) on every successful call; this local check is just a
+// cheap client-side pre-filter to skip an obviously-stale token before
+// even attempting a call. The server is the source of truth: if a call
+// goes out with a token that has actually expired, handleApiResult()
+// below catches the 401 and forces a clean re-login. Window matches
+// CONFIG.SESSION_SLIDING_HOURS on the backend (4h) plus a little slack.
+const SESSION_LOCAL_WINDOW_MS = 4.5 * 3600 * 1000;
+
 function getStoredToken() {
   const ts    = parseInt(localStorage.getItem('tcp_token_ts') || '0', 10);
   const token = localStorage.getItem('tcp_token');
-  if (!token || Date.now() - ts > 7 * 3600 * 1000) return null;  // 7hr expiry
+  if (!token || Date.now() - ts > SESSION_LOCAL_WINDOW_MS) return null;
   return token;
 }
 
@@ -159,7 +168,7 @@ const API = {
     try {
       const res  = await fetch(url);          // simple GET, no custom headers
       const text = await res.text();
-      try { return JSON.parse(text); }
+      try { return handleApiResult(JSON.parse(text)); }
       catch(e) {
         console.error('[API.get] non-JSON response for', path, text.substring(0, 300));
         return { success: false, data: { error: 'Server returned non-JSON response' } };
@@ -179,7 +188,7 @@ const API = {
     try {
       const res  = await fetch(url, { method: 'POST', body: JSON.stringify(body) });
       const text = await res.text();
-      try { return JSON.parse(text); }
+      try { return handleApiResult(JSON.parse(text)); }
       catch(e) {
         console.error('[API.post] non-JSON response for', path, text.substring(0, 300));
         return { success: false, data: { error: 'Server returned non-JSON response' } };
@@ -190,6 +199,34 @@ const API = {
     }
   }
 };
+
+// ── Sliding Session Handling ──────────────────────────────────
+// [Feat] Every authenticated response may carry a renewed session_token
+// (the backend extends the session on each successful call — see
+// Auth.gs issueSessionToken()). Pick it up here so ALL pages benefit
+// automatically, with zero per-page code.
+//
+// If the session has genuinely expired (401 Unauthorized), force a
+// clean re-login instead of leaving the page silently unresponsive —
+// this is the fix for "เปิดหน้าเว็บทิ้งไว้แล้วกดอะไรไม่ตอบสนอง".
+// A 403 Forbidden (valid session, insufficient role) is NOT treated as
+// expiry and must not log the user out.
+function handleApiResult(result) {
+  if (result && result.session_token) {
+    _idToken = result.session_token;
+    storeToken(result.session_token);
+  }
+  if (result && result.success === false && result.status === 401) {
+    const onLoginPage = /(^|\/)index\.html$/.test(location.pathname) ||
+                         location.pathname === '/' || location.pathname.endsWith('/');
+    if (!onLoginPage) {
+      clearAuth();
+      showToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่', 'warning', 4000);
+      setTimeout(() => { location.href = 'index.html'; }, 1200);
+    }
+  }
+  return result;
+}
 
 // ── Status / Priority UI Helpers ──────────────────────────────
 const STATUS_COLORS = {
