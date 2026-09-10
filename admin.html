@@ -86,6 +86,7 @@
           <h3 class="fs-16">จัดการผู้ใช้งาน</h3>
           <div class="d-flex gap-8">
             <input type="text" class="form-control" id="user-search" placeholder="🔍 ค้นหา..." style="width:220px" oninput="filterUsers()">
+            <button class="btn btn-primary btn-sm" id="btn-register-user" style="display:none" onclick="openRegisterModal()">➕ ลงทะเบียน</button>
           </div>
         </div>
         <div class="card">
@@ -229,11 +230,11 @@
           <div class="d-flex gap-12 align-center" style="flex-wrap:wrap">
             <div>
               <div class="form-label" style="font-size:11px;margin-bottom:4px">วันที่เริ่มต้น</div>
-              <input type="date" class="form-control" id="audit-date-from" onchange="filterAudit()" style="width:150px">
+              <input type="text" class="form-control" id="audit-date-from" placeholder="DD/MM/YYYY" maxlength="10" oninput="formatDateInput(this);filterAudit()" style="width:150px">
             </div>
             <div>
               <div class="form-label" style="font-size:11px;margin-bottom:4px">วันที่สิ้นสุด</div>
-              <input type="date" class="form-control" id="audit-date-to" onchange="filterAudit()" style="width:150px">
+              <input type="text" class="form-control" id="audit-date-to" placeholder="DD/MM/YYYY" maxlength="10" oninput="formatDateInput(this);filterAudit()" style="width:150px">
             </div>
             <div style="padding-top:18px;display:flex;gap:8px">
               <button class="btn btn-secondary btn-sm" onclick="clearAuditFilters()">✖ ล้าง</button>
@@ -263,20 +264,32 @@
   </div>
 </div>
 
-<!-- ── Role Change Modal ────────────────────────────────── -->
+<!-- ── Edit User Modal (name/department/phone/role) ──────── -->
 <div class="modal-overlay" id="role-modal">
   <div class="modal">
     <div class="modal-header">
-      <span class="modal-title">🔑 เปลี่ยน Role</span>
+      <span class="modal-title">✏️ แก้ไขข้อมูลผู้ใช้</span>
       <button class="modal-close" onclick="closeModal('role-modal')">×</button>
     </div>
     <div class="modal-body">
       <div class="form-group">
-        <label class="form-label">ผู้ใช้</label>
+        <label class="form-label">อีเมล</label>
         <input class="form-control" id="role-user-email" readonly>
       </div>
       <div class="form-group">
-        <label class="form-label">Role ใหม่</label>
+        <label class="form-label">ชื่อ-นามสกุล</label>
+        <input class="form-control" id="edit-user-name" placeholder="ชื่อ-นามสกุล">
+      </div>
+      <div class="form-group">
+        <label class="form-label">แผนก</label>
+        <input class="form-control" id="edit-user-department" placeholder="แผนก">
+      </div>
+      <div class="form-group">
+        <label class="form-label">เบอร์โทร</label>
+        <input class="form-control" id="edit-user-phone" placeholder="เบอร์โทร">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role</label>
         <select class="form-control" id="role-select">
           <option value="USER">USER — พนักงานทั่วไป</option>
           <option value="IT_STAFF">IT_STAFF — IT Support</option>
@@ -286,7 +299,47 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('role-modal')">ยกเลิก</button>
-      <button class="btn btn-primary"   onclick="saveRole()">💾 บันทึก</button>
+      <button class="btn btn-primary"   onclick="saveUserEdit()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Register New User Modal ────────────────────────────── -->
+<div class="modal-overlay" id="register-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">➕ ลงทะเบียนผู้ใช้ใหม่</span>
+      <button class="modal-close" onclick="closeModal('register-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">อีเมล <span class="required">*</span></label>
+        <input class="form-control" id="reg-email" placeholder="เช่น somchai@tcpharmachem.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">ชื่อ-นามสกุล <span class="required">*</span></label>
+        <input class="form-control" id="reg-name" placeholder="ชื่อ-นามสกุล">
+      </div>
+      <div class="form-group">
+        <label class="form-label">แผนก</label>
+        <input class="form-control" id="reg-department" placeholder="แผนก">
+      </div>
+      <div class="form-group">
+        <label class="form-label">เบอร์โทร</label>
+        <input class="form-control" id="reg-phone" placeholder="เบอร์โทร">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <select class="form-control" id="reg-role">
+          <option value="USER" selected>USER — พนักงานทั่วไป</option>
+          <option value="IT_STAFF">IT_STAFF — IT Support</option>
+          <option value="IT_MANAGER">IT_MANAGER — IT Manager</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('register-modal')">ยกเลิก</button>
+      <button class="btn btn-primary"   onclick="saveRegisterUser()">💾 ลงทะเบียน</button>
     </div>
   </div>
 </div>
@@ -352,7 +405,7 @@
     <div class="modal-body">
       <div class="form-group">
         <label class="form-label">วันที่ <span class="required">*</span></label>
-        <input type="date" class="form-control" id="holiday-date">
+        <input type="text" class="form-control" id="holiday-date" placeholder="DD/MM/YYYY" maxlength="10" oninput="formatDateInput(this)">
       </div>
       <div class="form-group">
         <label class="form-label">ชื่อวันหยุด (ภาษาไทย) <span class="required">*</span></label>
@@ -381,6 +434,10 @@
     document.getElementById('user-name').textContent = user.display_name||user.email;
     document.getElementById('user-role-label').textContent = user.role;
     document.getElementById('user-avatar').textContent = (user.display_name||'U')[0];
+  }
+  if (isManager()) {
+    const btnReg = document.getElementById('btn-register-user');
+    if (btnReg) btnReg.style.display = '';
   }
 
   let allUsers=[], allFAQs=[], allAudit=[], auditLimit=100;
@@ -416,7 +473,7 @@
         <td class="fs-12 text-muted">${formatDate(u.last_login)}</td>
         <td><span style="color:${u.is_active==='TRUE'?'var(--secondary)':'var(--danger)'}">${u.is_active==='TRUE'?'✅ Active':'❌ Inactive'}</span></td>
         <td>
-          ${isManager()?`<button class="btn btn-secondary btn-sm" onclick="openRoleModal('${u.email}','${u.role||'USER'}')">🔑 Role</button>`:''}
+          ${isManager()?`<button class="btn btn-secondary btn-sm" onclick="openEditUserModal('${u.email}')">✏️ แก้ไข</button>`:''}
         </td>
       </tr>`).join('') || '<tr><td colspan="8" class="text-center text-muted" style="padding:24px">ไม่มีผู้ใช้งาน</td></tr>';
   }
@@ -430,23 +487,63 @@
     ));
   }
 
-  function openRoleModal(email, role) {
-    document.getElementById('role-user-email').value = email;
-    document.getElementById('role-select').value = role;
+  function openEditUserModal(email) {
+    const u = allUsers.find(x => x.email === email);
+    if (!u) return;
+    document.getElementById('role-user-email').value     = u.email;
+    document.getElementById('edit-user-name').value       = u.display_name || '';
+    document.getElementById('edit-user-department').value = u.department   || '';
+    document.getElementById('edit-user-phone').value      = u.phone        || '';
+    document.getElementById('role-select').value          = u.role || 'USER';
     openModal('role-modal');
   }
 
-  async function saveRole() {
-    const email = document.getElementById('role-user-email').value;
-    const role  = document.getElementById('role-select').value;
+  async function saveUserEdit() {
+    const email      = document.getElementById('role-user-email').value;
+    const role       = document.getElementById('role-select').value;
+    const name       = document.getElementById('edit-user-name').value.trim();
+    const department = document.getElementById('edit-user-department').value.trim();
+    const phone      = document.getElementById('edit-user-phone').value.trim();
+    if (!name) { showToast('กรุณากรอกชื่อ-นามสกุล','warning'); return; }
     showLoader('กำลังบันทึก...');
     try {
-      const res = await API.post('user/role', { email, role });
-      if (res.success) {
-        showToast('เปลี่ยน Role สำเร็จ', 'success');
+      const [infoRes, roleRes] = await Promise.all([
+        API.post('user/update', { email, display_name: name, department, phone }),
+        API.post('user/role',   { email, role })
+      ]);
+      if (infoRes.success && roleRes.success) {
+        showToast('บันทึกข้อมูลผู้ใช้สำเร็จ', 'success');
         closeModal('role-modal');
         await loadUsers();
-      } else showToast(res.data?.error||'เกิดข้อผิดพลาด','error');
+      } else {
+        showToast((infoRes.data && infoRes.data.error) || (roleRes.data && roleRes.data.error) || 'เกิดข้อผิดพลาด', 'error');
+      }
+    } catch(e) { showToast('เกิดข้อผิดพลาด','error'); }
+    finally { hideLoader(); }
+  }
+
+  // ── Register New User ────────────────────────────────────────
+  function openRegisterModal() {
+    ['reg-email','reg-name','reg-department','reg-phone'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('reg-role').value = 'USER';
+    openModal('register-modal');
+  }
+
+  async function saveRegisterUser() {
+    const email      = document.getElementById('reg-email').value.trim();
+    const name       = document.getElementById('reg-name').value.trim();
+    const department = document.getElementById('reg-department').value.trim();
+    const phone      = document.getElementById('reg-phone').value.trim();
+    const role       = document.getElementById('reg-role').value;
+    if (!email || !name) { showToast('กรุณากรอกอีเมลและชื่อ-นามสกุล','warning'); return; }
+    showLoader('กำลังลงทะเบียน...');
+    try {
+      const res = await API.post('user/register', { email, display_name: name, department, phone, role });
+      if (res.success) {
+        showToast('ลงทะเบียนผู้ใช้สำเร็จ','success');
+        closeModal('register-modal');
+        await loadUsers();
+      } else showToast((res.data && res.data.error) || 'เกิดข้อผิดพลาด','error');
     } catch(e) { showToast('เกิดข้อผิดพลาด','error'); }
     finally { hideLoader(); }
   }
@@ -600,9 +697,14 @@
 
   function openHolidayModal() { openModal('holiday-modal'); }
   async function saveHoliday() {
-    const date  = document.getElementById('holiday-date').value;
+    const rawDate = document.getElementById('holiday-date').value;
+    const parsedDate = parseDDMMYYYY(rawDate);
+    if (!parsedDate) { showToast('กรุณากรอกวันที่ในรูปแบบ DD/MM/YYYY','warning'); return; }
+    const date = parsedDate.getFullYear() + '-' +
+                 String(parsedDate.getMonth() + 1).padStart(2,'0') + '-' +
+                 String(parsedDate.getDate()).padStart(2,'0');
     const nameTH= document.getElementById('holiday-name-th').value.trim();
-    if (!date||!nameTH) { showToast('กรุณากรอกวันที่และชื่อวันหยุด','warning'); return; }
+    if (!nameTH) { showToast('กรุณากรอกชื่อวันหยุด','warning'); return; }
     showLoader('กำลังบันทึก...');
     try {
       const res = await API.post('holiday/create',{
@@ -708,13 +810,13 @@
   function filterAudit() {
     const kw     = document.getElementById('audit-search').value.toLowerCase();
     const action = document.getElementById('audit-action-filter').value;
-    const df     = document.getElementById('audit-date-from').value;
-    const dt     = document.getElementById('audit-date-to').value;
+    const df     = parseDDMMYYYY(document.getElementById('audit-date-from').value);
+    const dt     = parseDDMMYYYY(document.getElementById('audit-date-to').value);
     renderAudit(allAudit.filter(l => {
       if (action && l.action !== action) return false;
       if (kw && !JSON.stringify(l).toLowerCase().includes(kw)) return false;
-      if (df && new Date(l.timestamp) < new Date(df)) return false;
-      if (dt && new Date(l.timestamp) > new Date(dt + 'T23:59:59')) return false;
+      if (df && new Date(l.timestamp) < df) return false;
+      if (dt && new Date(l.timestamp) > new Date(dt.getTime() + 86399999)) return false;
       return true;
     }));
   }
@@ -729,13 +831,13 @@
   function exportAuditExcel() {
     const kw     = document.getElementById('audit-search').value.toLowerCase();
     const action = document.getElementById('audit-action-filter').value;
-    const df     = document.getElementById('audit-date-from').value;
-    const dt     = document.getElementById('audit-date-to').value;
+    const df     = parseDDMMYYYY(document.getElementById('audit-date-from').value);
+    const dt     = parseDDMMYYYY(document.getElementById('audit-date-to').value);
     const filtered = allAudit.filter(l => {
       if (action && l.action !== action) return false;
       if (kw && !JSON.stringify(l).toLowerCase().includes(kw)) return false;
-      if (df && new Date(l.timestamp) < new Date(df)) return false;
-      if (dt && new Date(l.timestamp) > new Date(dt + 'T23:59:59')) return false;
+      if (df && new Date(l.timestamp) < df) return false;
+      if (dt && new Date(l.timestamp) > new Date(dt.getTime() + 86399999)) return false;
       return true;
     });
     const header = ['วันที่/เวลา','ผู้ดำเนินการ','Email','Role','การดำเนินการ (Code)','การดำเนินการ (ไทย)','Entity','ID','รายละเอียด'];
