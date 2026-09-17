@@ -96,6 +96,7 @@
               <option value="">ทุกสถานะ</option>
               <option>New Requests</option>
               <option>Working on it</option>
+              <option>Pending Approval</option>
               <option>Done</option>
               <option>Reopened</option>
               <option>SLA Risk</option>
@@ -591,12 +592,13 @@
 
   // ── Status Quick Tabs ────────────────────────────────────────
   const STATUS_TABS = [
-    { label: 'ทั้งหมด',    value: '',            color: '#444444' },
-    { label: 'New',        value: 'New Requests', color: '#1a73e8' },
-    { label: 'Working',    value: 'Working on it',color: '#f5a623' },
-    { label: 'Done',       value: 'Done',         color: '#34a853' },
-    { label: 'SLA Risk',   value: 'SLA Risk',     color: '#ff6d00' },
-    { label: 'Over SLA',   value: 'Over SLA',     color: '#ea4335' }
+    { label: 'ทั้งหมด',           value: '',                color: '#444444' },
+    { label: 'New',               value: 'New Requests',    color: '#1a73e8' },
+    { label: 'Working',           value: 'Working on it',   color: '#f5a623' },
+    { label: '🔎 Pending Approval', value: 'Pending Approval', color: '#5e35b1' },
+    { label: 'Done',               value: 'Done',            color: '#34a853' },
+    { label: 'SLA Risk',           value: 'SLA Risk',        color: '#ff6d00' },
+    { label: 'Over SLA',           value: 'Over SLA',        color: '#ea4335' }
   ];
 
   function updateStatusTabs(tickets) {
