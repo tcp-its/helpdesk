@@ -230,12 +230,13 @@ function handleApiResult(result) {
 
 // ── Status / Priority UI Helpers ──────────────────────────────
 const STATUS_COLORS = {
-  'New Requests':  { bg: '#e8f0fe', text: '#1a73e8', badge: 'badge-info' },
-  'Working on it': { bg: '#fef9e7', text: '#f5a623', badge: 'badge-warning' },
-  'Done':          { bg: '#e6f4ea', text: '#34a853', badge: 'badge-success' },
-  'Reopened':      { bg: '#f3e8fd', text: '#9c27b0', badge: 'badge-purple' },
-  'SLA Risk':      { bg: '#fff3e0', text: '#ff9800', badge: 'badge-orange' },
-  'Over SLA':      { bg: '#fce8e6', text: '#ea4335', badge: 'badge-danger' }
+  'New Requests':      { bg: '#e8f0fe', text: '#1a73e8', badge: 'badge-info' },
+  'Working on it':     { bg: '#fef9e7', text: '#f5a623', badge: 'badge-warning' },
+  'Pending Approval':  { bg: '#ede7f6', text: '#5e35b1', badge: 'badge-purple' },
+  'Done':              { bg: '#e6f4ea', text: '#34a853', badge: 'badge-success' },
+  'Reopened':          { bg: '#f3e8fd', text: '#9c27b0', badge: 'badge-purple' },
+  'SLA Risk':          { bg: '#fff3e0', text: '#ff9800', badge: 'badge-orange' },
+  'Over SLA':          { bg: '#fce8e6', text: '#ea4335', badge: 'badge-danger' }
 };
 
 const PRIORITY_COLORS = {
@@ -245,12 +246,13 @@ const PRIORITY_COLORS = {
 };
 
 const STATUS_ICONS = {
-  'New Requests':  '📥',
-  'Working on it': '⚙️',
-  'Done':          '✅',
-  'Reopened':      '🔁',
-  'SLA Risk':      '⚠️',
-  'Over SLA':      '🚨'
+  'New Requests':      '📥',
+  'Working on it':     '⚙️',
+  'Pending Approval':  '🔎',
+  'Done':              '✅',
+  'Reopened':          '🔁',
+  'SLA Risk':          '⚠️',
+  'Over SLA':          '🚨'
 };
 
 function statusBadge(status) {
