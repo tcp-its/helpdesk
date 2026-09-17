@@ -736,9 +736,9 @@
           const safeId = String(t.ticket_id).replace(/[^a-zA-Z0-9_-]/g, '');
           const hist = Array.isArray(t.history) ? t.history.slice().reverse() : [];
           const histRows = hist.map(h => `
-            <div style="padding:8px 0;border-bottom:1px solid var(--border,#eee)">
+            <div style="padding:8px 0;border-bottom:1px solid var(--border)">
               <div class="fs-12 text-muted">${formatDate(h.at)} · ${h.manager_name || h.manager_email || '—'}</div>
-              <div class="fs-13" style="margin-top:2px">${(h.note || '').replace(/</g, '&lt;')}</div>
+              <div class="fs-13" style="margin-top:2px;color:var(--text)">${(h.note || '').replace(/</g, '&lt;')}</div>
             </div>`).join('') || '<div class="fs-12 text-muted" style="padding:8px 0">ไม่มีบันทึก</div>';
           return `<tr>
               <td><span style="color:var(--primary);font-weight:700;font-size:12px">${t.ticket_id}</span></td>
@@ -751,7 +751,7 @@
               </a></td>
             </tr>
             <tr id="reject-hist-row-${safeId}" style="display:none">
-              <td colspan="6" style="background:var(--bg-subtle,#fafafa);padding:4px 16px">${histRows}</td>
+              <td colspan="6" style="background:var(--surface-alt);padding:4px 16px;color:var(--text)">${histRows}</td>
             </tr>`;
         }).join('')
       : '<tr><td colspan="6" class="text-center text-muted" style="padding:24px">ไม่มี Ticket ที่ถูกตีกลับ ✅</td></tr>';
