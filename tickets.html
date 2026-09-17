@@ -270,6 +270,18 @@
             <div id="detail-actions" style="display:flex;flex-direction:column;gap:8px;min-width:180px"></div>
           </div>
 
+          <!-- [Feat] Close-approval workflow — shown when this ticket has ever been rejected and isn't Done yet -->
+          <div id="reject-banner" style="display:none;padding:12px 14px;background:#fce8e6;border:1px solid #f6b6ad;border-radius:8px;margin-bottom:16px;color:#8f2f24">
+            <div style="font-weight:700;font-size:13px">❌ Manager ไม่อนุมัติปิด Ticket</div>
+            <div id="reject-banner-note" style="margin-top:4px;font-size:13px;line-height:1.6"></div>
+            <div style="margin-top:8px">
+              <a href="#" onclick="toggleRejectHistory(event)" style="font-size:12px;color:#8f2f24;text-decoration:underline">
+                ดูประวัติการตีกลับทั้งหมด (<span id="reject-history-count">0</span>) <span id="reject-history-caret">▾</span>
+              </a>
+            </div>
+            <div id="reject-history-list" style="display:none;margin-top:8px;font-size:12px;border-top:1px solid #f6b6ad;padding-top:8px"></div>
+          </div>
+
           <div class="tabs mt-16">
             <div class="tab active" onclick="switchDetailTab('info',this)">📋 ข้อมูล</div>
             <div class="tab" onclick="switchDetailTab('chat',this)">💬 Chat Log</div>
@@ -339,42 +351,60 @@
             <div class="text-muted fs-11 mt-4">ใช้เมื่อขยาย/ปรับกรอบเวลาให้ ticket เป็นกรณีพิเศษ — บันทึกลง Audit Log</div>
           </div>
 
-          <!-- Status Update -->
-          <div class="form-group">
-            <label class="form-label">เปลี่ยนสถานะ</label>
-            <select class="form-control" id="detail-status-select">
-              <option>New Requests</option>
-              <option>Working on it</option>
-              <option>Done</option>
-              <option>SLA Risk</option>
-              <option>Over SLA</option>
-            </select>
+          <!-- [Feat] Close-approval workflow — IT_MANAGER reviews a Pending Approval ticket -->
+          <div class="form-group" id="approve-close-section" style="display:none;padding:12px;background:#ede7f6;border:1px solid #b39ddb;border-radius:8px;margin-bottom:16px">
+            <label class="form-label" style="color:#5e35b1">🔎 ตรวจสอบก่อนปิด (IT_MANAGER)</label>
+            <div class="text-muted fs-11 mb-8">Staff ขออนุมัติปิด Ticket นี้แล้ว — ตรวจสอบ "วิธีแก้ไข" ด้านบนก่อนตัดสินใจ</div>
+            <textarea class="form-control" id="reject-note-input" rows="2" placeholder="ถ้าไม่อนุมัติ ระบุเหตุผล/สิ่งที่ยังต้องแก้ไขที่นี่ (จำเป็นก่อนกดไม่อนุมัติ)"></textarea>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button class="btn btn-success" style="flex:1" onclick="approveClose()">✅ อนุมัติปิด</button>
+              <button class="btn btn-danger" style="flex:1" onclick="rejectClose()">❌ ไม่อนุมัติ</button>
+            </div>
           </div>
 
-          <!-- Assign -->
-          <div class="form-group" id="assign-section">
-            <label class="form-label">มอบหมายให้</label>
-            <select class="form-control" id="detail-assign-select">
-              <option value="">— เลือก IT Staff —</option>
-            </select>
+          <!-- [Feat] Close-approval workflow — read-only notice for non-managers while pending -->
+          <div id="pending-approval-readonly" style="display:none;padding:12px;background:#ede7f6;border:1px solid #b39ddb;border-radius:8px;margin-bottom:16px;color:#5e35b1;font-size:13px">
+            ⏳ ส่งขออนุมัติปิดแล้ว — รอ Manager ตรวจสอบ
           </div>
 
-          <!-- Resolution -->
-          <div class="form-group">
-            <label class="form-label">วิธีแก้ไข</label>
-            <textarea class="form-control" id="detail-resolution-input" rows="4" placeholder="อธิบายวิธีที่แก้ไขปัญหา..."></textarea>
-          </div>
+          <div id="normal-actions-section">
+            <!-- Status Update -->
+            <div class="form-group">
+              <label class="form-label">เปลี่ยนสถานะ</label>
+              <select class="form-control" id="detail-status-select">
+                <option>New Requests</option>
+                <option>Working on it</option>
+                <option>Done</option>
+                <option>SLA Risk</option>
+                <option>Over SLA</option>
+              </select>
+            </div>
 
-          <!-- Root Cause -->
-          <div class="form-group">
-            <label class="form-label">Root Cause</label>
-            <textarea class="form-control" id="detail-rootcause-input" rows="2" placeholder="สาเหตุของปัญหา..."></textarea>
-          </div>
+            <!-- Assign -->
+            <div class="form-group" id="assign-section">
+              <label class="form-label">มอบหมายให้</label>
+              <select class="form-control" id="detail-assign-select">
+                <option value="">— เลือก IT Staff —</option>
+              </select>
+            </div>
 
-          <div style="display:flex;flex-direction:column;gap:8px">
-            <button class="btn btn-primary btn-block" onclick="saveTicketUpdate()">💾 บันทึกการอัพเดต</button>
-            <button class="btn btn-success btn-block" onclick="closeTicket()" id="close-ticket-btn">✅ ปิด Ticket</button>
-            <button class="btn btn-secondary btn-block" onclick="reopenTicket()" id="reopen-ticket-btn" style="display:none">🔁 เปิดใหม่</button>
+            <!-- Resolution -->
+            <div class="form-group">
+              <label class="form-label">วิธีแก้ไข</label>
+              <textarea class="form-control" id="detail-resolution-input" rows="4" placeholder="อธิบายวิธีที่แก้ไขปัญหา..."></textarea>
+            </div>
+
+            <!-- Root Cause -->
+            <div class="form-group">
+              <label class="form-label">Root Cause</label>
+              <textarea class="form-control" id="detail-rootcause-input" rows="2" placeholder="สาเหตุของปัญหา..."></textarea>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <button class="btn btn-primary btn-block" onclick="saveTicketUpdate()">💾 บันทึกการอัพเดต</button>
+              <button class="btn btn-success btn-block" onclick="closeTicket()" id="close-ticket-btn">✅ ปิด Ticket</button>
+              <button class="btn btn-secondary btn-block" onclick="reopenTicket()" id="reopen-ticket-btn" style="display:none">🔁 เปิดใหม่</button>
+            </div>
           </div>
 
           <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">
@@ -461,6 +491,24 @@
   let allTickets = [];
   let currentTicket = null;
   let selectedScore = 0;
+
+  // [Feat] ประเภท Ticket + KPI Mapping — mirrors backend Config.js so the
+  // inline "ประเภท" editor can show/save without a round-trip, and the
+  // "KPI" value (never independently editable) can preview instantly.
+  const TICKET_TYPES = [
+    'Hardware','Software','Server/Network','Account & Access Management',
+    'Backup / Recovery','Fixed Assets','IT Equipment / Consultation','MA Renewal'
+  ];
+  const KPI_MAP = {
+    'Hardware':                     'Support Helpdesk',
+    'Software':                     'Support Helpdesk',
+    'Server/Network':               'IT Infrastructure Reliability',
+    'Account & Access Management':  'IT Security & Endpoint Protection',
+    'Backup / Recovery':            'Data Protection & Recovery Management',
+    'Fixed Assets':                 'Purchasing & Assets',
+    'IT Equipment / Consultation':  'Purchasing & Assets',
+    'MA Renewal':                   'MA Renewal'
+  };
 
   // Setup nav
   const user = getCurrentUser();
@@ -730,10 +778,17 @@
     document.getElementById('detail-title').textContent = t.title;
 
     // Meta
+    // [Feat] "ประเภท" แก้ไขได้ inline สำหรับ IT_STAFF/IT_MANAGER — "KPI" คำนวณตาม
+    // อัตโนมัติเสมอ (ไม่มีช่องแก้ไขแยก) ดู KPI_MAP ด้านบนของไฟล์นี้
+    const typeValueHtml = isITStaff()
+      ? `<select id="detail-type-select" class="form-control" style="display:inline-block;width:auto;font-size:12px;padding:2px 6px;height:auto" onchange="saveTicketType(this.value)">` +
+          TICKET_TYPES.map(ty => `<option value="${ty}" ${ty===t.ticket_type?'selected':''}>${ty}</option>`).join('') +
+        `</select>`
+      : t.ticket_type;
     document.getElementById('detail-meta').innerHTML = `
       ${statusBadge(t.status)} ${priorityBadge(t.priority)}
-      <div class="detail-meta-item"><div class="detail-meta-label">ประเภท</div><div class="detail-meta-value">${t.ticket_type}</div></div>
-      <div class="detail-meta-item"><div class="detail-meta-label">KPI</div><div class="detail-meta-value">${t.kpi_category}</div></div>
+      <div class="detail-meta-item"><div class="detail-meta-label">ประเภท</div><div class="detail-meta-value" id="detail-type-value">${typeValueHtml}</div></div>
+      <div class="detail-meta-item"><div class="detail-meta-label">KPI</div><div class="detail-meta-value" id="detail-kpi-value">${t.kpi_category}</div></div>
       <div class="detail-meta-item"><div class="detail-meta-label">ผู้แจ้ง</div><div class="detail-meta-value">${t.requester_name}</div></div>
       <div class="detail-meta-item"><div class="detail-meta-label">สร้างเมื่อ</div><div class="detail-meta-value">${formatDate(t.created_at)}</div></div>
       ${t.sla_deadline ? `<div class="detail-meta-item"><div class="detail-meta-label">SLA Deadline</div><div class="detail-meta-value" style="color:${new Date(t.sla_deadline)<new Date()?'var(--danger)':'var(--warning)'}">${formatDate(t.sla_deadline)}</div></div>` : ''}
@@ -850,13 +905,59 @@
       document.getElementById('detail-resolution-input').value = t.resolution || '';
       document.getElementById('detail-rootcause-input').value  = t.root_cause || '';
 
-      // Show/hide close & reopen buttons
-      if (t.status === 'Done') {
-        document.getElementById('close-ticket-btn').style.display   = 'none';
-        document.getElementById('reopen-ticket-btn').style.display  = 'flex';
+      // [Feat] Close-approval workflow — swap the whole action area depending
+      // on status: normal edit/close controls, OR (if Pending Approval) the
+      // manager's approve/reject box, OR a read-only "waiting" notice.
+      const normalSection  = document.getElementById('normal-actions-section');
+      const approveSection = document.getElementById('approve-close-section');
+      const pendingNotice  = document.getElementById('pending-approval-readonly');
+
+      if (t.status === 'Pending Approval') {
+        normalSection.style.display  = 'none';
+        if (isManager()) {
+          approveSection.style.display = 'block';
+          pendingNotice.style.display  = 'none';
+          document.getElementById('reject-note-input').value = '';
+        } else {
+          approveSection.style.display = 'none';
+          pendingNotice.style.display  = 'block';
+        }
       } else {
-        document.getElementById('close-ticket-btn').style.display   = 'flex';
-        document.getElementById('reopen-ticket-btn').style.display  = 'none';
+        normalSection.style.display  = 'block';
+        approveSection.style.display = 'none';
+        pendingNotice.style.display  = 'none';
+
+        // Show/hide close & reopen buttons
+        const closeBtn = document.getElementById('close-ticket-btn');
+        if (t.status === 'Done') {
+          closeBtn.style.display  = 'none';
+          document.getElementById('reopen-ticket-btn').style.display  = 'flex';
+        } else {
+          closeBtn.style.display  = 'flex';
+          // IT_MANAGER closes directly; IT_STAFF only requests approval.
+          closeBtn.textContent = isManager() ? '✅ ปิด Ticket' : '📨 ส่งขออนุมัติปิด';
+          document.getElementById('reopen-ticket-btn').style.display  = 'none';
+        }
+      }
+
+      // [Feat] Rejection banner — visible to anyone viewing a ticket that has
+      // been sent back at least once and isn't finally closed yet.
+      const rejectBanner = document.getElementById('reject-banner');
+      const rejectCount  = parseInt(t.close_reject_count || 0, 10);
+      if (rejectCount > 0 && t.status !== 'Done') {
+        let history = [];
+        try { history = JSON.parse(t.reject_history || '[]'); } catch (e) { history = []; }
+        const latest = history[history.length - 1];
+        rejectBanner.style.display = 'block';
+        document.getElementById('reject-banner-note').textContent = latest ? latest.note : '';
+        document.getElementById('reject-history-count').textContent = history.length;
+        document.getElementById('reject-history-list').innerHTML = history.slice().reverse().map(h =>
+          `<div style="margin-bottom:6px"><b>${formatDate(h.at)}</b> — ${h.manager_name}<br>${h.note}</div>`
+        ).join('') || '<div class="text-muted">ไม่มีประวัติ</div>';
+        document.getElementById('reject-history-list').style.display = 'none';
+        document.getElementById('reject-history-caret').textContent = '▾';
+      } else {
+        rejectBanner.style.display = 'none';
       }
 
       // Satisfaction score (มีคะแนนแล้ว)
@@ -1082,7 +1183,10 @@
   async function closeTicket() {
     const resolution = document.getElementById('detail-resolution-input').value;
     if (!resolution.trim()) { showToast('กรุณาระบุวิธีแก้ไขก่อนปิด Ticket', 'warning'); return; }
-    showLoader('กำลังปิด Ticket...');
+    // [Feat] IT_MANAGER closes directly; IT_STAFF only requests approval —
+    // the backend decides which happens (closeTicketWithResolution routes by
+    // role), we just show the right message for whichever it returns.
+    showLoader(isManager() ? 'กำลังปิด Ticket...' : 'กำลังส่งขออนุมัติ...');
     try {
       const res = await API.post('ticket/close', {
         ticket_id:  currentTicket.ticket_id,
@@ -1090,14 +1194,75 @@
         root_cause: document.getElementById('detail-rootcause-input').value
       });
       if (res.success) {
-        showToast('ปิด Ticket สำเร็จ', 'success');
+        const finalStatus = res.data.status; // 'Done' (manager) or 'Pending Approval' (staff)
+        showToast(finalStatus === 'Done' ? 'ปิด Ticket สำเร็จ' : 'ส่งขออนุมัติปิดแล้ว รอ Manager ตรวจสอบ', 'success');
         closeModal('ticket-detail-modal');
-        _applyLocalUpdate({ status: 'Done', resolution });
+        _applyLocalUpdate({ status: finalStatus, resolution });
       } else {
         showToast(res.data?.error || 'เกิดข้อผิดพลาด', 'error');
       }
     } catch(e) { showToast('เกิดข้อผิดพลาด', 'error'); }
     finally { hideLoader(); }
+  }
+
+  // [Feat] Close-approval workflow — inline "ประเภท" edit (IT_STAFF/IT_MANAGER)
+  async function saveTicketType(newType) {
+    const kpiPreview = document.getElementById('detail-kpi-value');
+    kpiPreview.textContent = KPI_MAP[newType] || 'General IT Support';
+    try {
+      const res = await API.post('ticket/update', { ticket_id: currentTicket.ticket_id, ticket_type: newType });
+      if (res.success) {
+        currentTicket.ticket_type  = res.data.ticket_type;
+        currentTicket.kpi_category = res.data.kpi_category;
+        kpiPreview.textContent = currentTicket.kpi_category;
+        _applyLocalUpdate({ ticket_type: currentTicket.ticket_type, kpi_category: currentTicket.kpi_category });
+        showToast('บันทึกประเภทใหม่แล้ว — KPI อัปเดตตามอัตโนมัติ', 'success');
+      } else {
+        showToast(res.data?.error || 'บันทึกไม่สำเร็จ', 'error');
+      }
+    } catch(e) { showToast('เกิดข้อผิดพลาด', 'error'); }
+  }
+
+  // [Feat] Close-approval workflow — IT_MANAGER approve / reject
+  async function approveClose() {
+    showLoader('กำลังอนุมัติปิด Ticket...');
+    try {
+      const res = await API.post('ticket/approve-close', { ticket_id: currentTicket.ticket_id });
+      if (res.success) {
+        showToast('อนุมัติปิด Ticket สำเร็จ', 'success');
+        closeModal('ticket-detail-modal');
+        _applyLocalUpdate({ status: 'Done' });
+      } else {
+        showToast(res.data?.error || 'เกิดข้อผิดพลาด', 'error');
+      }
+    } catch(e) { showToast('เกิดข้อผิดพลาด', 'error'); }
+    finally { hideLoader(); }
+  }
+
+  async function rejectClose() {
+    const note = document.getElementById('reject-note-input').value;
+    if (!note.trim()) { showToast('กรุณาระบุเหตุผลที่ไม่อนุมัติ', 'warning'); return; }
+    showLoader('กำลังส่งกลับ...');
+    try {
+      const res = await API.post('ticket/reject-close', { ticket_id: currentTicket.ticket_id, note });
+      if (res.success) {
+        showToast('ส่ง Ticket กลับให้ staff แก้ไขแล้ว', 'success');
+        closeModal('ticket-detail-modal');
+        _applyLocalUpdate({ status: 'Working on it', close_reject_count: res.data.close_reject_count, reject_history: res.data.reject_history });
+      } else {
+        showToast(res.data?.error || 'เกิดข้อผิดพลาด', 'error');
+      }
+    } catch(e) { showToast('เกิดข้อผิดพลาด', 'error'); }
+    finally { hideLoader(); }
+  }
+
+  function toggleRejectHistory(event) {
+    event.preventDefault();
+    const list  = document.getElementById('reject-history-list');
+    const caret = document.getElementById('reject-history-caret');
+    const open  = list.style.display !== 'none';
+    list.style.display = open ? 'none' : 'block';
+    caret.textContent  = open ? '▾' : '▴';
   }
 
   async function reopenTicket() {
