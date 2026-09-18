@@ -586,7 +586,7 @@
       const slaText  = t.sla_deadline ? `<span style="color:${new Date(t.sla_deadline)<new Date()?'var(--danger)':'var(--text-secondary)'};font-size:11px">${formatDate(t.sla_deadline)}</span>` : '<span class="text-muted">—</span>';
       return `<tr class="${rowClass}" onclick="openTicketDetail('${t.ticket_id}')">
         <td><span style="font-weight:700;color:var(--primary);font-size:12px">${t.ticket_id}</span></td>
-        <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.title||'—'}</td>
+        <td style="max-width:200px;white-space:nowrap;overflow-x:auto;overflow-y:hidden" title="${(t.title||'').replace(/"/g,'&quot;')}">${t.title||'—'}</td>
         <td class="fs-12">${t.requester_name||'—'}</td>
         <td class="fs-12">${t.ticket_type||'—'}</td>
         <td>${statusBadge(t.status)}</td>
