@@ -176,8 +176,26 @@
 
 <script src="assets/js/app.js"></script>
 <script>
-  google.charts.load('current', { packages: ['corechart', 'bar', 'gauge'] });
-  google.charts.setOnLoadCallback(initDashboard);
+  // [Fix 2026-09-18] ถ้าโหลด Google Charts จาก CDN (gstatic.com) ไม่สำเร็จ —
+  // เน็ตหลุด, ถูกไฟร์วอลล์บล็อก, CDN ล่ม ฯลฯ — เดิมหน้านี้จะค้างว่างเปล่าตลอด
+  // ไปโดยไม่มีข้อความอะไรบอกผู้ใช้เลยว่าเกิดอะไรขึ้น (setOnLoadCallback ไม่มี
+  // ทาง fire) เพิ่ม timeout เป็นตัวกันเหนียว: ถ้าผ่านไป ~10 วิ แล้วยังไม่โหลด
+  // สำเร็จ ให้แจ้งผู้ใช้แทนที่จะปล่อยว่างเงียบๆ — ครอบด้วย try/catch ด้วย
+  // เผื่อ <script src="...gstatic.com/charts/loader.js"> เองก็โหลดไม่สำเร็จ
+  // (กรณีนั้น google จะยังไม่ถูกประกาศเลยด้วยซ้ำ ไม่ใช่แค่ callback ไม่ทำงาน)
+  let _chartsLoaded = false;
+  function _chartsLoadFailed() {
+    showToast('โหลดกราฟไม่สำเร็จ (เชื่อมต่อ Google Charts ไม่ได้) กรุณาตรวจสอบอินเทอร์เน็ตแล้วรีเฟรชหน้านี้ใหม่', 'error', 8000);
+    console.error('[Google Charts] load timeout/failure after 10s — google.visualization not ready');
+  }
+  try {
+    google.charts.load('current', { packages: ['corechart', 'bar', 'gauge'] });
+    google.charts.setOnLoadCallback(() => { _chartsLoaded = true; initDashboard(); });
+  } catch (e) {
+    console.error('[Google Charts] loader script failed:', e);
+    setTimeout(_chartsLoadFailed, 0);
+  }
+  setTimeout(() => { if (!_chartsLoaded) _chartsLoadFailed(); }, 10000);
 
   // ── Auth Guard ──────────────────────────────────────────────
   if (!loadStoredSession()) { location.href = 'index.html'; }
@@ -263,6 +281,11 @@
       { icon:'📥', label:'Ticket ใหม่วันนี้',  value: data.new_today,      bg:'#fce8e6', color:'#ea4335' },
       { icon:'⚙️', label:'กำลังดำเนินการ',    value: s.working,           bg:'#fff3e0', color:'#f5a623' },
       { icon:'✅', label:'เสร็จสิ้นวันนี้',    value: data.done_today,     bg:'#e6f4ea', color:'#34a853' },
+      // [Fix 2026-09-18] "รออนุมัติปิด" (Pending Approval) มีอยู่จริงใน workflow
+      // (ดู requestTicketClose/approveTicketClose ใน TicketManager.js) แต่เดิม
+      // ไม่เคยแสดงที่ไหนใน Dashboard เลย — ผู้ใช้มองไม่เห็นว่ามี Ticket ค้างรอ
+      // manager อนุมัติอยู่กี่ใบ ต้องเข้าไปดูในหน้า Ticket ทั้งหมดเอาเอง
+      { icon:'⏳', label:'รออนุมัติปิด',       value: s.pending_approval,  bg:'#f3e8fd', color:'#9c27b0' },
       { icon:'⚠️', label:'SLA Risk',           value: s.sla_risk,          bg:'#fff8e1', color:'#ff9800' },
       { icon:'🚨', label:'เกิน SLA',           value: s.over_sla,          bg:'#fce8e6', color:'#ea4335' },
       { icon:'⏱️', label:'เวลาแก้ไขเฉลี่ย',  value: data.avg_time_hrs + ' ชม.', bg:'#e8f0fe', color:'#1a73e8' },
@@ -277,8 +300,11 @@
         </div>
       </div>`).join('');
 
-    // Nav badge
-    const openCount = (s.new || 0) + (s.working || 0) + (s.sla_risk || 0) + (s.over_sla || 0);
+    // Nav badge — [Fix 2026-09-18] เดิมนับแค่ new/working/sla_risk/over_sla
+    // ทำให้ Ticket ที่ Reopened หรือรออนุมัติปิด (Pending Approval) ซึ่งก็ยังไม่
+    // Done เหมือนกัน ไม่ถูกนับรวมใน badge เลข "ยังไม่เสร็จ" ที่เมนู Ticket ทั้งหมด
+    const openCount = (s.new || 0) + (s.working || 0) + (s.sla_risk || 0) + (s.over_sla || 0)
+                     + (s.reopened || 0) + (s.pending_approval || 0);
     document.getElementById('nav-open-count').textContent = openCount;
   }
 
@@ -306,10 +332,13 @@
 
   // ── Status Donut Chart ──────────────────────────────────────
   function renderStatusChart(summary) {
+    // [Fix 2026-09-18] เดิม mapping นี้ไม่มี "Pending Approval" (รออนุมัติปิด)
+    // เลย ทำให้ Ticket ที่อยู่ในสถานะนี้หายไปจากกราฟโดนัทสถานะไปเงียบๆ
     const mapping = {
       'New Requests': summary.new, 'Working on it': summary.working,
       'Done': summary.done, 'Reopened': summary.reopened,
-      'SLA Risk': summary.sla_risk, 'Over SLA': summary.over_sla
+      'SLA Risk': summary.sla_risk, 'Over SLA': summary.over_sla,
+      'Pending Approval': summary.pending_approval
     };
     const data = new google.visualization.DataTable();
     data.addColumn('string', 'สถานะ');
@@ -317,7 +346,7 @@
     Object.entries(mapping).forEach(([k, v]) => { if (v > 0) data.addRow([k, v]); });
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     new google.visualization.PieChart(document.getElementById('status-chart')).draw(data, {
-      colors:    ['#1a73e8','#f5a623','#34a853','#9c27b0','#ff9800','#ea4335'],
+      colors:    ['#1a73e8','#f5a623','#34a853','#9c27b0','#ff9800','#ea4335','#c2185b'],
       pieHole:   0.45,
       legend:    { position: 'right', textStyle: { fontSize: 11, color: isDark ? '#aaa' : '#666' } },
       chartArea: { left: 10, right: 160, top: 10, bottom: 10 },
@@ -389,13 +418,17 @@
   // ── Recent Tickets ──────────────────────────────────────────
   async function renderRecentTickets() {
     try {
-      const res = await API.get('tickets', { limit: 8 });
+      // [Fix 2026-09-18] เดิมขอ limit:8 จาก server แต่โชว์แค่ 6 ใบแรกเอง
+      // ฝั่ง frontend (.slice(0,6)) — ตอนนี้ backend รองรับ limit จริงแล้ว
+      // (ดู searchTickets()/buildFilters() ใน Code.js) เลยขอแค่ 6 ตรงๆ
+      // ไม่ต้องโหลดเกินมาแล้วมาตัดทิ้งเองอีกที
+      const res = await API.get('tickets', { limit: 6 });
       const container = document.getElementById('recent-tickets-list');
       if (!res.success || !res.data.length) {
         container.innerHTML = '<div class="empty-state"><div class="empty-icon">🎫</div><p>ยังไม่มี Ticket</p></div>';
         return;
       }
-      container.innerHTML = res.data.slice(0, 6).map(t => `
+      container.innerHTML = res.data.map(t => `
         <div class="recent-ticket" onclick="location.href='tickets.html?id=${t.ticket_id}'">
           <div style="flex:1">
             <div class="d-flex align-center gap-8 mb-4">

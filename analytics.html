@@ -404,11 +404,25 @@
     _fpTo   = null;
   }
 
-  google.charts.load('current', { packages: ['corechart','bar','gauge','table'] });
-  google.charts.setOnLoadCallback(() => {
-    setDefaultDates();
-    loadAnalytics();
-  });
+  // [Fix 2026-09-18] เหมือนกับ dashboard.html — กัน CDN Google Charts โหลด
+  // ไม่สำเร็จแล้วหน้าค้างว่างเปล่าตลอดไปโดยไม่มีข้อความบอกผู้ใช้เลย
+  let _chartsLoaded = false;
+  function _chartsLoadFailed() {
+    showToast('โหลดกราฟไม่สำเร็จ (เชื่อมต่อ Google Charts ไม่ได้) กรุณาตรวจสอบอินเทอร์เน็ตแล้วรีเฟรชหน้านี้ใหม่', 'error', 8000);
+    console.error('[Google Charts] load timeout/failure after 10s — google.visualization not ready');
+  }
+  try {
+    google.charts.load('current', { packages: ['corechart','bar','gauge','table'] });
+    google.charts.setOnLoadCallback(() => {
+      _chartsLoaded = true;
+      setDefaultDates();
+      loadAnalytics();
+    });
+  } catch (e) {
+    console.error('[Google Charts] loader script failed:', e);
+    setTimeout(_chartsLoadFailed, 0);
+  }
+  setTimeout(() => { if (!_chartsLoaded) _chartsLoadFailed(); }, 10000);
 
   // ── Date Range ──────────────────────────────────────────────
   function setDefaultDates() {
@@ -421,18 +435,38 @@
   }
 
   // ── Load All Analytics ──────────────────────────────────────
-  let analyticsData = null;
-  let allTickets    = [];
+  let analyticsData   = null;
+  let allTickets      = [];
+  let filteredTickets = [];   // [Fix 2026-09-18] exportExcel() ใช้ชุดนี้แทน allTickets
 
   async function loadAnalytics() {
     showLoader('กำลังวิเคราะห์ข้อมูล...');
+
+    // [Fix 2026-09-18] อ่านช่วงวันที่ที่เลือกไว้ก่อนยิง API แล้วส่งไปให้
+    // server กรองด้วย — เดิม buildAnalyticsData() ฝั่ง backend ไม่เคยรับ/ใช้
+    // date_from/date_to เลย ทำให้ตัวกรองช่วงวันที่มีผลแค่กับ array ของ
+    // ticket ที่กรองเองด้านล่าง (STAGE 3) ส่วน sla/reject_summary/by_type/
+    // by_kpi/ai_analytics/ticket_trend ที่มาจาก analyticsData (server) ยังเป็น
+    // ข้อมูลทั้งหมดตลอดกาลเสมอ ทำให้ตัวเลข KPI การ์ดกับกราฟ/ตารางด้านล่าง
+    // ขัดแย้งกันเองบนหน้าเดียวกัน
+    const dfEl = document.getElementById('date-from');
+    const dtEl = document.getElementById('date-to');
+    const df   = dfEl ? parseDDMMYYYY(dfEl.value) : null;
+    const dt   = dtEl ? parseDDMMYYYY(dtEl.value) : null;
+    const dfMs  = (df instanceof Date && !isNaN(df.getTime())) ? df.getTime()            : null;
+    const dtMax = (dt instanceof Date && !isNaN(dt.getTime())) ? dt.getTime() + 86399999 : null;
+
+    const isoLocalDate = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    const analyticsParams = {};
+    if (df instanceof Date && !isNaN(df.getTime())) analyticsParams.date_from = isoLocalDate(df);
+    if (dt instanceof Date && !isNaN(dt.getTime())) analyticsParams.date_to   = isoLocalDate(dt);
 
     // ── STAGE 1: Fetch APIs (allSettled = ไม่มีทาง throw) ───────
     let aRes = { success: false }, tRes = { success: false }, kbRes = { success: false };
     try {
       const ticketEndpoint = (typeof isITStaff === 'function' && isITStaff()) ? 'tickets' : 'tickets/my';
       const [aS, tS, kbS] = await Promise.allSettled([
-        API.get('analytics'),
+        API.get('analytics', analyticsParams),
         API.get(ticketEndpoint),
         API.get('kb')
       ]);
@@ -464,13 +498,6 @@
       analyticsData = (aRes.data != null) ? aRes.data : {};
       allTickets    = (tRes.success === true && Array.isArray(tRes.data)) ? tRes.data : [];
 
-      const dfEl = document.getElementById('date-from');
-      const dtEl = document.getElementById('date-to');
-      const df   = dfEl ? parseDDMMYYYY(dfEl.value) : null;
-      const dt   = dtEl ? parseDDMMYYYY(dtEl.value) : null;
-      const dfMs  = (df instanceof Date && !isNaN(df.getTime())) ? df.getTime()            : null;
-      const dtMax = (dt instanceof Date && !isNaN(dt.getTime())) ? dt.getTime() + 86399999 : null;
-
       const filtered = allTickets.filter(t => {
         if (!t || !t.created_at) return true;
         const d = new Date(t.created_at);
@@ -478,6 +505,7 @@
         const ms = d.getTime();
         return (dfMs === null || ms >= dfMs) && (dtMax === null || ms <= dtMax);
       });
+      filteredTickets = filtered;  // [Fix 2026-09-18] ให้ exportExcel() ใช้ชุดที่กรองแล้ว
 
       const kbData = (kbRes.success === true && Array.isArray(kbRes.data)) ? kbRes.data : [];
 
@@ -929,9 +957,12 @@
   }
 
   // ── Export Functions ─────────────────────────────────────────
+  // [Fix 2026-09-18] เดิมใช้ allTickets (ทั้งหมดตลอดกาล ไม่กรองตามช่วงวันที่
+  // ที่เลือกไว้บนหน้าจอ) ทำให้ไฟล์ export ไม่ตรงกับข้อมูลที่กำลังดูอยู่บนหน้า
+  // เปลี่ยนมาใช้ filteredTickets (ชุดเดียวกับที่ใช้ render กราฟ/ตารางบนหน้านี้)
   function exportExcel() {
     const rows = [['Ticket ID','Title','Requester','Type','KPI','Status','Priority','Assignee','SLA Deadline','Closed At','SLA Status','Resolution Time (hrs)','Satisfaction']];
-    allTickets.forEach(t=>rows.push([t.ticket_id,t.title,t.requester_name,t.ticket_type,t.kpi_category,t.status,t.priority,t.assigned_name,t.sla_deadline,t.closed_at,t.sla_status,t.sla_actual_hours,t.satisfaction_score]));
+    filteredTickets.forEach(t=>rows.push([t.ticket_id,t.title,t.requester_name,t.ticket_type,t.kpi_category,t.status,t.priority,t.assigned_name,t.sla_deadline,t.closed_at,t.sla_status,t.sla_actual_hours,t.satisfaction_score]));
     const csv = rows.map(r=>r.map(c=>'"'+(c||'').toString().replace(/"/g,'""')+'"').join(',')).join('\n');
     const a = document.createElement('a');
     a.href = 'data:text/csv;charset=utf-8,﻿'+encodeURIComponent(csv);
