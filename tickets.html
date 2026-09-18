@@ -233,8 +233,10 @@
           </div>
           <div class="form-group" style="grid-column:1/-1">
             <label class="form-label">แนบไฟล์ (ถ้ามี)</label>
-            <input type="file" class="form-control" id="nt-file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx">
-            <div class="text-muted fs-12 mt-8">รองรับ: รูปภาพ, PDF, Word, Excel (ขนาดไม่เกิน 10MB/ไฟล์)</div>
+            <input type="file" class="form-control" id="nt-file" multiple
+              accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.log"
+              onchange="handleNewTicketFileSelect(event)">
+            <div class="text-muted fs-12 mt-8">รองรับ: รูปภาพ, เอกสาร Office (Word/Excel/PowerPoint), PDF, ไฟล์ข้อความ/CSV/Log (ไม่เกิน 10MB/ไฟล์)</div>
           </div>
         </div>
       </form>
@@ -311,6 +313,16 @@
             <div id="attachments-section" style="display:none">
               <div class="form-label text-muted">ไฟล์แนบจากผู้แจ้ง</div>
               <div class="attachment-list" id="detail-attachments"></div>
+            </div>
+
+            <!-- [Feat 2026-09-18] แนบไฟล์เพิ่มเติมหลังเปิด Ticket แล้ว — เจ้าของ Ticket หรือ ITS แนบได้ -->
+            <div style="margin-top:8px">
+              <input type="file" id="detail-attach-file" style="display:none"
+                accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.log"
+                onchange="handleAttachFileSelect(event)">
+              <button type="button" class="btn btn-secondary" style="font-size:12px;padding:6px 12px"
+                onclick="document.getElementById('detail-attach-file').click()">📎 แนบไฟล์เพิ่ม</button>
+              <span id="detail-attach-status" class="text-muted fs-12" style="display:none;margin-left:8px">⏳ กำลังอัปโหลด...</span>
             </div>
 
             <!-- [Feat] รูปยืนยันงาน — IT Staff อัปโหลด -->
@@ -713,9 +725,16 @@
     const prio   = document.getElementById('nt-priority').value;
     const tdateRaw = document.getElementById('nt-target-date').value;
     const onBehalfEmail = document.getElementById('nt-onbehalf') ? document.getElementById('nt-onbehalf').value : '';
+    const fileInput = document.getElementById('nt-file');
+    const files = fileInput && fileInput.files ? Array.from(fileInput.files) : [];
 
     if (!title || !desc || !type || !prio) { showToast('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน', 'warning'); return; }
     if (prio === 'Normal' && !tdateRaw) { showToast('กรุณาระบุวันที่ต้องการให้เสร็จ', 'warning'); return; }
+
+    // [Feat 2026-09-18] เช็คไฟล์แนบซ้ำอีกรอบก่อนสร้าง Ticket (กันเผื่อ event onchange ไม่ทำงาน)
+    for (const f of files) {
+      if (!_validateAttachmentFile(f)) return;
+    }
 
     // แปลง DD/MM/YYYY → YYYY-MM-DD สำหรับ backend
     const tdateParsed = parseDDMMYYYY(tdateRaw);
@@ -731,11 +750,25 @@
     try {
       const res = await API.post('ticket/create', { title, description: desc, ticket_type: type, priority: prio, target_date: tdate, on_behalf_of_email: onBehalfEmail });
       if (res.success) {
-        showToast(`✅ เปิด Ticket สำเร็จ! ID: ${res.data.ticket_id}`, 'success', 5000);
+        const ticketId = res.data.ticket_id;
+        showToast(`✅ เปิด Ticket สำเร็จ! ID: ${ticketId}`, 'success', 5000);
+
+        // [Feat 2026-09-18] อัปโหลดไฟล์แนบที่เลือกไว้ (ถ้ามี) ต่อจาก Ticket ที่เพิ่งสร้าง
+        // ต้องรอให้มี ticket_id ก่อนถึงจะแนบได้ (โฟลเดอร์ Drive ผูกกับเลข Ticket)
+        if (files.length) {
+          btn.textContent = '⏳ กำลังแนบไฟล์...';
+          let failCount = 0;
+          for (const f of files) {
+            try { await uploadTicketAttachment(ticketId, f); }
+            catch (e) { failCount++; console.error('[submitNewTicket] attach failed:', f.name, e); }
+          }
+          if (failCount) showToast(`⚠️ แนบไฟล์ไม่สำเร็จ ${failCount} จาก ${files.length} ไฟล์`, 'warning', 6000);
+        }
+
         closeModal('new-ticket-modal');
         document.getElementById('new-ticket-form').reset();
         await loadTickets();
-        openTicketDetail(res.data.ticket_id);
+        openTicketDetail(ticketId);
       } else {
         showToast('เกิดข้อผิดพลาด: ' + (res.data?.error || 'กรุณาลองใหม่'), 'error');
       }
@@ -1298,6 +1331,72 @@
       btn.disabled    = false;
       btn.textContent = '📨 ส่ง Survey ซ้ำ';
     }
+  }
+
+  // ── Ticket Attachments (User เจ้าของ Ticket / ITS) ──────────
+  // [Feat 2026-09-18] แนบไฟล์เข้า Ticket ได้จริง (เดิมช่องแนบไฟล์ในฟอร์มเปิด Ticket
+  // มี UI แต่ไม่เคยส่งไฟล์ไปที่ backend เลย) — allow-list นี้ต้องตรงกับ
+  // CONFIG.ATTACHMENT.ALLOWED_EXTENSIONS ฝั่ง backend เสมอ ถ้าจะเพิ่ม/ลดนามสกุลให้แก้ทั้งคู่
+  const ATTACHMENT_ALLOWED_EXT = ['jpg','jpeg','png','gif','pdf','doc','docx','xls','xlsx','ppt','pptx','csv','txt','log'];
+  const ATTACHMENT_MAX_MB = 10;
+
+  // ตรวจไฟล์ตอนเลือก (นามสกุล + ขนาด) — ให้ error ทันทีแทนที่จะบอกลิสต์ยาวๆ ไว้ล่วงหน้าตลอดเวลา
+  function _validateAttachmentFile(file) {
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    if (ATTACHMENT_ALLOWED_EXT.indexOf(ext) === -1) {
+      showToast('ไม่รองรับไฟล์นามสกุล .' + ext + ' — รองรับ: ' + ATTACHMENT_ALLOWED_EXT.join(', '), 'error', 6000);
+      return false;
+    }
+    if (file.size > ATTACHMENT_MAX_MB * 1024 * 1024) {
+      showToast('ไฟล์ "' + file.name + '" มีขนาดเกิน ' + ATTACHMENT_MAX_MB + 'MB', 'error');
+      return false;
+    }
+    return true;
+  }
+
+  // เรียกตอนเลือกไฟล์ในฟอร์มเปิด Ticket ใหม่ — ตรวจทันทีตอนเลือก ถ้ามีไฟล์ผิดประเภทให้ล้างการเลือกทั้งหมด
+  function handleNewTicketFileSelect(event) {
+    const files = Array.from(event.target.files || []);
+    for (const f of files) {
+      if (!_validateAttachmentFile(f)) {
+        event.target.value = '';
+        return;
+      }
+    }
+  }
+
+  // เรียกตอนแนบไฟล์เพิ่มจากหน้ารายละเอียด Ticket (หลังเปิด Ticket ไปแล้ว)
+  async function handleAttachFileSelect(event) {
+    const file = event.target.files[0];
+    event.target.value = ''; // reset ให้เลือกไฟล์เดิมซ้ำได้
+    if (!file) return;
+    if (!_validateAttachmentFile(file)) return;
+
+    const statusEl = document.getElementById('detail-attach-status');
+    statusEl.style.display = 'inline';
+    try {
+      await uploadTicketAttachment(currentTicket.ticket_id, file);
+      showToast('📎 แนบไฟล์สำเร็จ', 'success');
+      await openTicketDetail(currentTicket.ticket_id);
+    } catch (e) {
+      showToast('แนบไฟล์ไม่สำเร็จ: ' + (e.message || 'กรุณาลองใหม่'), 'error');
+    } finally {
+      statusEl.style.display = 'none';
+    }
+  }
+
+  // อ่านไฟล์เป็น base64 แล้วส่งไป ticket/attach (backend อัปโหลดขึ้น Drive จริง)
+  async function uploadTicketAttachment(ticketId, file) {
+    const dataUrl  = await _fileToBase64(file);
+    const fileData = dataUrl.split(',')[1]; // ตัด "data:...;base64," ออก
+    const res = await API.post('ticket/attach', {
+      ticket_id: ticketId,
+      file_name: file.name,
+      mime_type: file.type || 'application/octet-stream',
+      file_data: fileData
+    });
+    if (!res.success) throw new Error(res.data?.error || 'แนบไฟล์ไม่สำเร็จ');
+    return res.data;
   }
 
   // ── Completion Image Upload (IT Staff) ──────────────────────
