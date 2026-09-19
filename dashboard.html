@@ -11,21 +11,29 @@
   <style>
     .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
     .dash-grid.full { grid-template-columns: 1fr; }
-    .ai-summary-card { background: linear-gradient(135deg, #1a73e8, #0d47a1); color: #fff; border: none; }
-    .ai-summary-card .card-header { border-color: rgba(255,255,255,.2); }
-    .ai-summary-card .card-title  { color: #fff; }
+    .summary-banner { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; border: none; }
+    .summary-banner .card-header { border-color: rgba(255,255,255,.2); }
+    .summary-banner .card-title  { color: #fff; }
+    .kpi-card.clickable { cursor: pointer; }
+    .kpi-icon-svg svg { width: 22px; height: 22px; display: block; }
     .workload-bar { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
     .workload-bar:last-child { border: none; }
     .workload-name { width: 120px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .workload-fill { flex: 1; background: var(--border); height: 8px; border-radius: 4px; overflow: hidden; }
-    .workload-fill-inner { height: 100%; background: var(--primary); border-radius: 4px; transition: width .5s ease; }
+    .workload-fill { flex: 1; display: flex; background: var(--surface-alt); height: 10px; border-radius: 5px; overflow: hidden; }
+    .workload-seg { height: 100%; transition: width .5s ease; }
     .workload-count { font-size: 12px; font-weight: 700; min-width: 24px; text-align: right; }
+    .workload-legend { display: flex; gap: 16px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-secondary); }
+    .legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
     .sla-ring { display: flex; align-items: center; justify-content: center; flex-direction: column; }
     #sla-chart { margin: 0 auto; }
     .recent-ticket { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
     .recent-ticket:last-child { border: none; }
     .recent-ticket:hover { opacity: .8; }
     .ticket-id-badge { font-size: 10px; font-weight: 700; color: var(--primary); background: var(--primary-light); padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+    .urgent-row { cursor: pointer; }
+    .urgent-row td { font-size: 13px; }
+    .age-tag { font-size: 11px; color: var(--text-secondary); }
     .trend-positive { color: var(--secondary); }
     .trend-negative { color: var(--danger); }
     @media (max-width: 900px) { .dash-grid { grid-template-columns: 1fr; } }
@@ -75,11 +83,10 @@
 
     <div class="page-content">
 
-      <!-- AI Executive Summary -->
-      <div class="card ai-summary-card mb-16" id="ai-summary-card">
+      <!-- Management Summary Banner -->
+      <div class="card summary-banner mb-16" id="ai-summary-card">
         <div class="card-header">
-          <span style="font-size:20px">🤖</span>
-          <span class="card-title">AI Executive Summary</span>
+          <span class="card-title">สรุปภาพรวมสำหรับผู้บริหาร</span>
           <span style="font-size:11px;opacity:.7" id="summary-time"></span>
         </div>
         <div class="card-body">
@@ -92,13 +99,33 @@
         <!-- Populated by JS -->
       </div>
 
+      <!-- Urgent Action Table -->
+      <div class="card mb-20" id="urgent-card">
+        <div class="card-header">
+          <span class="card-title">Ticket ที่ต้องเร่งดำเนินการ</span>
+          <span class="text-muted fs-12" id="urgent-subtitle"></span>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Ticket ID</th><th>เรื่อง</th><th>ความเร่งด่วน</th><th>สถานะ</th><th>ผู้รับผิดชอบ</th><th>อายุงาน</th>
+              </tr>
+            </thead>
+            <tbody id="urgent-tbody">
+              <tr><td colspan="6"><div class="empty-state"><div class="spinner spinner-sm"></div></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- Row 1 -->
       <div class="dash-grid mb-20">
 
         <!-- Ticket Trend Chart -->
         <div class="card">
           <div class="card-header">
-            <span class="card-title">📈 Ticket 7 วันล่าสุด</span>
+            <span class="card-title">Ticket 7 วันล่าสุด</span>
             <span class="text-muted fs-12" id="trend-subtitle"></span>
           </div>
           <div class="card-body" style="padding:12px">
@@ -108,7 +135,7 @@
 
         <!-- Status Distribution -->
         <div class="card">
-          <div class="card-header"><span class="card-title">📊 สถานะ Ticket</span></div>
+          <div class="card-header"><span class="card-title">สถานะ Ticket</span></div>
           <div class="card-body" style="padding:12px">
             <div id="status-chart" style="height:220px"></div>
           </div>
@@ -120,7 +147,7 @@
 
         <!-- SLA Performance -->
         <div class="card">
-          <div class="card-header"><span class="card-title">⏱️ SLA Performance</span></div>
+          <div class="card-header"><span class="card-title">SLA Performance</span></div>
           <div class="card-body">
             <div class="d-flex align-center gap-16 mb-16">
               <div id="sla-chart" style="height:160px;width:160px"></div>
@@ -138,7 +165,7 @@
 
         <!-- Team Workload -->
         <div class="card">
-          <div class="card-header"><span class="card-title">👥 Team Workload</span></div>
+          <div class="card-header"><span class="card-title">ภาระงานทีม (Team Workload)</span></div>
           <div class="card-body" id="workload-container">
             <div class="empty-state">
               <div class="spinner spinner-sm"></div>
@@ -150,9 +177,9 @@
       <!-- Row 3 -->
       <div class="dash-grid mb-20">
 
-        <!-- Ticket Type Distribution -->
+        <!-- Top 5 Ticket Type (30 days) -->
         <div class="card">
-          <div class="card-header"><span class="card-title">🗂️ ประเภท Ticket</span></div>
+          <div class="card-header"><span class="card-title">Top 5 ประเภท Ticket (30 วันล่าสุด)</span></div>
           <div class="card-body" style="padding:12px">
             <div id="type-chart" style="height:240px"></div>
           </div>
@@ -161,7 +188,7 @@
         <!-- Recent Tickets -->
         <div class="card">
           <div class="card-header">
-            <span class="card-title">🕐 Ticket ล่าสุด</span>
+            <span class="card-title">Ticket ล่าสุด</span>
             <a href="tickets.html" class="btn btn-secondary btn-sm">ดูทั้งหมด →</a>
           </div>
           <div class="card-body" id="recent-tickets-list">
@@ -222,6 +249,43 @@
     }
   }
 
+  // ── Dashboard-local (emoji-free) status/priority badges ──────
+  // [Feat 2026-09-19] Dashboard เป็นหน้าข้อมูล/รายงาน จึงไม่ใช้ emoji แสดง
+  // สถานะที่นี่ — ใช้สีล้วนแทน ต่างจาก statusBadge()/priorityBadge() ใน
+  // app.js ซึ่งยังใช้ emoji เหมือนเดิมสำหรับหน้า Ticket ทั้งหมด/Admin
+  // (ไม่แตะ app.js เพื่อไม่ให้กระทบหน้าอื่น)
+  const DASH_STATUS_COLORS = {
+    'New Requests':      { bg: 'var(--primary-light)', color: 'var(--primary)' },
+    'Working on it':     { bg: '#fef9e7', color: 'var(--warning)' },
+    'Pending Approval':  { bg: '#ede7f6', color: '#5e35b1' },
+    'Done':               { bg: '#e6f4ea', color: 'var(--secondary)' },
+    'Reopened':           { bg: '#f3e8fd', color: 'var(--purple)' },
+    'SLA Risk':           { bg: '#fff3e0', color: 'var(--orange)' },
+    'Over SLA':           { bg: '#fce8e6', color: 'var(--danger)' }
+  };
+  const DASH_PRIORITY_COLORS = {
+    'Urgent': 'var(--danger)',
+    'Normal': 'var(--warning)',
+    'Low':    'var(--secondary)'
+  };
+  function dashStatusBadge(status) {
+    const c = DASH_STATUS_COLORS[status] || { bg: 'var(--surface-alt)', color: 'var(--text-secondary)' };
+    return `<span class="badge" style="background:${c.bg};color:${c.color}">${status}</span>`;
+  }
+  function dashPriorityBadge(priority) {
+    const color = DASH_PRIORITY_COLORS[priority] || 'var(--text-secondary)';
+    return `<span class="badge" style="color:${color};border:1px solid ${color}">${priority}</span>`;
+  }
+
+  // ── Icon set (no emoji — plain stroked SVG, colored via currentColor) ──
+  const DASH_ICONS = {
+    ticket: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+    clock:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>',
+    gear:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8" stroke-dasharray="3 3"/></svg>',
+    warn:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 L22 20 L2 20 Z"/><line x1="12" y1="10" x2="12" y2="15"/><circle cx="12" cy="17.4" r="0.6" fill="currentColor" stroke="none"/></svg>',
+    alert:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="7" x2="12" y2="13"/><circle cx="12" cy="16.4" r="0.6" fill="currentColor" stroke="none"/></svg>'
+  };
+
   // ── Dashboard Init ──────────────────────────────────────────
   let dashData = null;
 
@@ -237,12 +301,13 @@
         return;
       }
       dashData = res.data;
-      try { renderKPIs(dashData); }          catch(e) { console.error('renderKPIs:', e); }
-      try { renderTrendChart(dashData.trend); } catch(e) { console.error('renderTrend:', e); }
+      try { renderKPIs(dashData); }               catch(e) { console.error('renderKPIs:', e); }
+      try { renderUrgentTable(dashData.urgent_tickets); } catch(e) { console.error('renderUrgentTable:', e); }
+      try { renderTrendChart(dashData.trend); }    catch(e) { console.error('renderTrend:', e); }
       try { renderStatusChart(dashData.summary); } catch(e) { console.error('renderStatus:', e); }
-      try { renderSLAGauge(dashData.sla); }    catch(e) { console.error('renderSLA:', e); }
-      try { renderWorkload(dashData.workload); } catch(e) { console.error('renderWorkload:', e); }
-      try { renderTypeChart(dashData.summary.by_type); } catch(e) { console.error('renderType:', e); }
+      try { renderSLAGauge(dashData.sla); }        catch(e) { console.error('renderSLA:', e); }
+      try { renderWorkload(dashData.workload_detail); } catch(e) { console.error('renderWorkload:', e); }
+      try { renderTypeChart(dashData.top_types_30d); }  catch(e) { console.error('renderType:', e); }
       renderRecentTickets();
       document.getElementById('summary-time').textContent = new Date().toLocaleTimeString('th-TH');
       // Load AI summary separately — non-blocking (Groq AI is slow)
@@ -261,7 +326,7 @@
         document.getElementById('summary-time').textContent = new Date().toLocaleTimeString('th-TH');
       }
     } catch(e) {
-      document.getElementById('ai-summary-text').textContent = 'ไม่สามารถสร้างสรุป AI ได้ในขณะนี้';
+      document.getElementById('ai-summary-text').textContent = 'ไม่สามารถสร้างสรุปได้ในขณะนี้';
       console.error('loadAISummary error:', e);
     }
   }
@@ -272,28 +337,26 @@
     loadDashboard().then(() => { btn.textContent = '🔄'; });
   }
 
-  // ── KPI Cards ───────────────────────────────────────────────
+  // ── KPI Cards (6 — click-through to filtered Ticket list) ────
   function renderKPIs(data) {
-    const s   = data.summary;
-    const sla = data.sla;
+    const s = data.summary;
     const cards = [
-      { icon:'🎫', label:'Ticket ทั้งหมด',    value: s.total,             bg:'#e8f0fe', color:'#1a73e8' },
-      { icon:'📥', label:'Ticket ใหม่วันนี้',  value: data.new_today,      bg:'#fce8e6', color:'#ea4335' },
-      { icon:'⚙️', label:'กำลังดำเนินการ',    value: s.working,           bg:'#fff3e0', color:'#f5a623' },
-      { icon:'✅', label:'เสร็จสิ้นวันนี้',    value: data.done_today,     bg:'#e6f4ea', color:'#34a853' },
-      // [Fix 2026-09-18] "รออนุมัติปิด" (Pending Approval) มีอยู่จริงใน workflow
-      // (ดู requestTicketClose/approveTicketClose ใน TicketManager.js) แต่เดิม
-      // ไม่เคยแสดงที่ไหนใน Dashboard เลย — ผู้ใช้มองไม่เห็นว่ามี Ticket ค้างรอ
-      // manager อนุมัติอยู่กี่ใบ ต้องเข้าไปดูในหน้า Ticket ทั้งหมดเอาเอง
-      { icon:'⏳', label:'รออนุมัติปิด',       value: s.pending_approval,  bg:'#f3e8fd', color:'#9c27b0' },
-      { icon:'⚠️', label:'SLA Risk',           value: s.sla_risk,          bg:'#fff8e1', color:'#ff9800' },
-      { icon:'🚨', label:'เกิน SLA',           value: s.over_sla,          bg:'#fce8e6', color:'#ea4335' },
-      { icon:'⏱️', label:'เวลาแก้ไขเฉลี่ย',  value: data.avg_time_hrs + ' ชม.', bg:'#e8f0fe', color:'#1a73e8' },
-      { icon:'⭐', label:'ความพึงพอใจ',       value: data.avg_satisfaction + '/5', bg:'#fff8e1', color:'#f5a623' }
+      { icon: DASH_ICONS.ticket, label:'Ticket ทั้งหมด',   value: s.total,                bg:'var(--primary-light)', color:'var(--primary)',
+        href:'tickets.html' },
+      { icon: DASH_ICONS.clock,  label:'รอ Assign',         value: data.waiting_assign || 0, bg:'#f3e8fd', color:'var(--purple)',
+        href:'tickets.html?q=' + encodeURIComponent('pawapat@tcpharmachem.com') },
+      { icon: DASH_ICONS.gear,   label:'กำลังดำเนินการ',    value: s.working,              bg:'#fef9e7', color:'var(--warning)',
+        href:'tickets.html?status=' + encodeURIComponent('Working on it') },
+      { icon: DASH_ICONS.warn,   label:'SLA Risk',          value: s.sla_risk,             bg:'#fff3e0', color:'var(--orange)',
+        href:'tickets.html?status=' + encodeURIComponent('SLA Risk') },
+      { icon: DASH_ICONS.alert,  label:'เกิน SLA',          value: s.over_sla,             bg:'#fce8e6', color:'var(--danger)',
+        href:'tickets.html?status=' + encodeURIComponent('Over SLA') },
+      { icon: DASH_ICONS.clock,  label:'รออนุมัติปิด',       value: s.pending_approval,     bg:'#ede7f6', color:'#5e35b1',
+        href:'tickets.html?status=' + encodeURIComponent('Pending Approval') }
     ];
     document.getElementById('kpi-grid').innerHTML = cards.map(c => `
-      <div class="kpi-card">
-        <div class="kpi-icon" style="background:${c.bg}"><span style="color:${c.color}">${c.icon}</span></div>
+      <div class="kpi-card clickable" onclick="location.href='${c.href}'">
+        <div class="kpi-icon" style="background:${c.bg};color:${c.color}"><span class="kpi-icon-svg">${c.icon}</span></div>
         <div>
           <div class="kpi-value" style="color:${c.color}">${c.value}</div>
           <div class="kpi-label">${c.label}</div>
@@ -306,6 +369,25 @@
     const openCount = (s.new || 0) + (s.working || 0) + (s.sla_risk || 0) + (s.over_sla || 0)
                      + (s.reopened || 0) + (s.pending_approval || 0);
     document.getElementById('nav-open-count').textContent = openCount;
+  }
+
+  // ── Urgent Action Table ───────────────────────────────────────
+  function renderUrgentTable(list) {
+    const tbody = document.getElementById('urgent-tbody');
+    document.getElementById('urgent-subtitle').textContent = (list && list.length) ? list.length + ' รายการ' : '';
+    if (!list || !list.length) {
+      tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>ไม่มี Ticket ที่ต้องเร่งดำเนินการ</p></div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map(t => `
+      <tr class="urgent-row" onclick="location.href='tickets.html?id=${t.ticket_id}'">
+        <td><span style="font-weight:700;color:var(--primary)">${t.ticket_id}</span></td>
+        <td style="max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${(t.title||'').replace(/"/g,'&quot;')}">${t.title || '—'}</td>
+        <td>${dashPriorityBadge(t.priority)}</td>
+        <td>${dashStatusBadge(t.status)}</td>
+        <td class="fs-12">${t.assigned_name || '—'}</td>
+        <td class="age-tag">${t.age || '—'}</td>
+      </tr>`).join('');
   }
 
   // ── Trend Line Chart ────────────────────────────────────────
@@ -346,12 +428,13 @@
     Object.entries(mapping).forEach(([k, v]) => { if (v > 0) data.addRow([k, v]); });
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     new google.visualization.PieChart(document.getElementById('status-chart')).draw(data, {
-      colors:    ['#1a73e8','#f5a623','#34a853','#9c27b0','#ff9800','#ea4335','#c2185b'],
+      colors:    ['#1a73e8','#f5a623','#34a853','#9c27b0','#ff9800','#ea4335','#5e35b1'],
       pieHole:   0.45,
       legend:    { position: 'right', textStyle: { fontSize: 11, color: isDark ? '#aaa' : '#666' } },
       chartArea: { left: 10, right: 160, top: 10, bottom: 10 },
       backgroundColor: 'transparent',
-      pieSliceBorderColor: 'transparent'
+      pieSliceBorderColor: 'transparent',
+      tooltip: { text: 'both' }
     });
   }
 
@@ -360,7 +443,6 @@
     if (!sla) return;
     document.getElementById('sla-rate').textContent = sla.sla_rate_pct + '%';
     const data = google.visualization.arrayToDataTable([['Label','Value'],['SLA', sla.sla_rate_pct]]);
-    const color = sla.sla_rate_pct >= 90 ? '#34a853' : sla.sla_rate_pct >= 70 ? '#f5a623' : '#ea4335';
     new google.visualization.Gauge(document.getElementById('sla-chart')).draw(data, {
       min: 0, max: 100, yellowFrom: 70, yellowTo: 90,
       redFrom: 0, redTo: 70, greenFrom: 90, greenTo: 100,
@@ -368,50 +450,73 @@
     });
     document.getElementById('sla-stats').innerHTML = `
       <div class="d-flex justify-between fs-12 mb-8">
-        <span class="text-secondary">✅ Met</span><span class="fw-600" style="color:#34a853">${sla.sla_met}</span>
+        <span class="text-secondary"><span class="legend-dot" style="background:var(--secondary)"></span> Met</span>
+        <span class="fw-600" style="color:var(--secondary)">${sla.sla_met}</span>
       </div>
       <div class="d-flex justify-between fs-12 mb-8">
-        <span class="text-secondary">⚠️ At Risk</span><span class="fw-600" style="color:#ff9800">${sla.at_risk}</span>
+        <span class="text-secondary"><span class="legend-dot" style="background:var(--orange)"></span> At Risk</span>
+        <span class="fw-600" style="color:var(--orange)">${sla.at_risk}</span>
       </div>
       <div class="d-flex justify-between fs-12">
-        <span class="text-secondary">🚨 Breached</span><span class="fw-600" style="color:#ea4335">${sla.sla_breached}</span>
+        <span class="text-secondary"><span class="legend-dot" style="background:var(--danger)"></span> Breached</span>
+        <span class="fw-600" style="color:var(--danger)">${sla.sla_breached}</span>
       </div>`;
   }
 
-  // ── Workload Bars ───────────────────────────────────────────
-  function renderWorkload(workload) {
+  // ── Team Workload — stacked 3-color bar (Normal / SLA Risk / Over SLA) ─
+  function renderWorkload(detail) {
     const container = document.getElementById('workload-container');
-    if (!workload || Object.keys(workload).length === 0) {
-      container.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div><p>ยังไม่มีข้อมูล Workload</p></div>';
+    const entries = Object.entries(detail || {});
+    if (!entries.length) {
+      container.innerHTML = '<div class="empty-state"><p>ยังไม่มีข้อมูล Workload</p></div>';
       return;
     }
-    const max = Math.max(...Object.values(workload));
-    container.innerHTML = Object.entries(workload)
-      .sort(([,a],[,b]) => b - a)
-      .map(([name, count]) => `
+    const rows = entries.map(([name, w]) => ({
+      name,
+      normal:   w.normal   || 0,
+      sla_risk: w.sla_risk || 0,
+      over_sla: w.over_sla || 0,
+      total:    (w.normal||0) + (w.sla_risk||0) + (w.over_sla||0)
+    })).sort((a, b) => b.total - a.total);
+    const max = Math.max(...rows.map(r => r.total), 1);
+    container.innerHTML = rows.map(r => `
         <div class="workload-bar">
-          <div class="workload-name">${name}</div>
-          <div class="workload-fill"><div class="workload-fill-inner" style="width:${max > 0 ? (count/max*100) : 0}%"></div></div>
-          <div class="workload-count">${count}</div>
-        </div>`).join('');
+          <div class="workload-name" title="${r.name}">${r.name}</div>
+          <div class="workload-fill">
+            <div class="workload-seg" style="width:${r.normal/max*100}%;background:var(--primary)"   title="ปกติ: ${r.normal}"></div>
+            <div class="workload-seg" style="width:${r.sla_risk/max*100}%;background:var(--orange)" title="SLA Risk: ${r.sla_risk}"></div>
+            <div class="workload-seg" style="width:${r.over_sla/max*100}%;background:var(--danger)" title="เกิน SLA: ${r.over_sla}"></div>
+          </div>
+          <div class="workload-count">${r.total}</div>
+        </div>`).join('') +
+      `<div class="workload-legend">
+        <span class="legend-item"><span class="legend-dot" style="background:var(--primary)"></span>ปกติ</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--orange)"></span>SLA Risk</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--danger)"></span>เกิน SLA</span>
+      </div>`;
   }
 
-  // ── Type Bar Chart ──────────────────────────────────────────
-  function renderTypeChart(byType) {
-    if (!byType) return;
+  // ── Top 5 Ticket Type (30 days) Bar Chart ────────────────────
+  function renderTypeChart(topTypes) {
+    const container = document.getElementById('type-chart');
+    if (!topTypes || !topTypes.length) {
+      container.innerHTML = '<div class="empty-state"><p>ยังไม่มีข้อมูลในช่วง 30 วันล่าสุด</p></div>';
+      return;
+    }
     const data = new google.visualization.DataTable();
     data.addColumn('string', 'ประเภท');
     data.addColumn('number', 'จำนวน');
-    Object.entries(byType).forEach(([k,v]) => { if (v > 0) data.addRow([k, v]); });
+    topTypes.forEach(r => data.addRow([r.type, r.count]));
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    new google.visualization.BarChart(document.getElementById('type-chart')).draw(data, {
+    new google.visualization.BarChart(container).draw(data, {
       colors:    ['#1a73e8'],
       legend:    { position: 'none' },
       hAxis:     { minValue: 0, textStyle: { fontSize: 10, color: isDark ? '#aaa' : '#666' } },
       vAxis:     { textStyle: { fontSize: 10, color: isDark ? '#aaa' : '#666' } },
       chartArea: { left: 160, right: 20, top: 10, bottom: 30 },
       backgroundColor: 'transparent',
-      bar:       { groupWidth: '65%' }
+      bar:       { groupWidth: '65%' },
+      tooltip:   { text: 'value' }
     });
   }
 
@@ -425,7 +530,7 @@
       const res = await API.get('tickets', { limit: 6 });
       const container = document.getElementById('recent-tickets-list');
       if (!res.success || !res.data.length) {
-        container.innerHTML = '<div class="empty-state"><div class="empty-icon">🎫</div><p>ยังไม่มี Ticket</p></div>';
+        container.innerHTML = '<div class="empty-state"><p>ยังไม่มี Ticket</p></div>';
         return;
       }
       container.innerHTML = res.data.map(t => `
@@ -433,8 +538,8 @@
           <div style="flex:1">
             <div class="d-flex align-center gap-8 mb-4">
               <span class="ticket-id-badge">${t.ticket_id}</span>
-              ${statusBadge(t.status)}
-              ${priorityBadge(t.priority)}
+              ${dashStatusBadge(t.status)}
+              ${dashPriorityBadge(t.priority)}
             </div>
             <div class="fs-13 fw-600">${t.title || '—'}</div>
             <div class="fs-12 text-muted">${t.requester_name} • ${timeAgo(t.created_at)}</div>
@@ -445,7 +550,7 @@
 
   // ── AI Summary ──────────────────────────────────────────────
   function renderAISummary(summary) {
-    document.getElementById('ai-summary-text').textContent = summary || 'ไม่สามารถสร้าง AI Summary ได้ในขณะนี้';
+    document.getElementById('ai-summary-text').textContent = summary || 'ไม่สามารถสร้างสรุปได้ในขณะนี้';
   }
 
   // ── Sidebar & Lang ──────────────────────────────────────────

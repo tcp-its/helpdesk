@@ -459,8 +459,41 @@
               ⏳ กำลังอัปโหลด...
             </div>
           </div>
+
+          <!-- [Feat 2026-09-19] ลบ Ticket (soft delete) — IT_MANAGER เท่านั้น -->
+          <div id="delete-ticket-section" style="display:none;margin-top:16px">
+            <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">
+            <div style="padding:12px;background:#fce8e6;border:1px solid #f5b7b1;border-radius:8px">
+              <div class="form-label" style="color:#c62828">🗑️ ลบ Ticket (IT_MANAGER)</div>
+              <div class="text-muted fs-11 mb-8">Soft delete — Ticket จะหายจากทุกรายการและรายงาน แต่ยังตรวจสอบย้อนหลังได้ใน Google Sheet โดยตรง ต้องระบุเหตุผล และไม่สามารถกู้คืนได้จากหน้าเว็บ</div>
+              <button class="btn btn-danger btn-block" onclick="openDeleteTicketDialog()">🗑️ ลบ Ticket นี้</button>
+            </div>
+          </div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Delete Ticket Confirm Modal (IT_MANAGER) ─────────────── -->
+<div class="modal-overlay" id="delete-ticket-modal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <span class="modal-title" style="color:#c62828">🗑️ ยืนยันการลบ Ticket</span>
+      <button class="modal-close" onclick="closeModal('delete-ticket-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:14px;color:var(--text-secondary);margin-bottom:12px">
+        คุณกำลังจะลบ Ticket <strong id="delete-modal-ticket-id"></strong> — การลบนี้จะซ่อน Ticket ออกจากทุกรายการและรายงาน และ<strong>ไม่สามารถกู้คืนได้จากหน้าเว็บ</strong> (กู้คืนได้เฉพาะแก้ไขตรงใน Google Sheet เท่านั้น)
+      </p>
+      <div class="form-group">
+        <label class="form-label">เหตุผลที่ลบ <span style="color:var(--danger)">*</span></label>
+        <textarea class="form-control" id="delete-comment-input" rows="3" placeholder="เช่น แจ้งซ้ำ, Ticket ทดสอบระบบ ฯลฯ (จำเป็นต้องระบุ)"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('delete-ticket-modal')">ยกเลิก</button>
+      <button class="btn btn-danger" onclick="confirmDeleteTicket()">🗑️ ยืนยันลบ</button>
     </div>
   </div>
 </div>
@@ -537,11 +570,19 @@
   }
 
   // Auto-open modal if ?new=1 or ?id=xxx
+  // [Feat 2026-09-19] ?status=... หรือ ?q=... — รองรับคลิกจาก KPI card ใน
+  // Dashboard เพื่อกรองรายการมาให้ตรงเงื่อนไขทันที (ไม่กระทบพฤติกรรมเดิม
+  // เมื่อไม่มี param เหล่านี้)
   window.addEventListener('load', async () => {
     await loadTickets();
     if (isITStaff()) await loadUsersLookup();
     if (urlParams.get('new')) openNewTicketModal();
     if (urlParams.get('id')) openTicketDetail(urlParams.get('id'));
+    if (urlParams.get('status')) setStatusTab(urlParams.get('status'));
+    if (urlParams.get('q')) {
+      document.getElementById('search-input').value = urlParams.get('q');
+      applyFilters();
+    }
   });
 
   // ── Requester Lookup ("open ticket on behalf of") ────────────
@@ -962,6 +1003,9 @@
         slaMgrSection.style.display = 'none';
       }
 
+      // [Feat 2026-09-19] ลบ Ticket — IT_MANAGER เท่านั้น
+      document.getElementById('delete-ticket-section').style.display = isManager() ? 'block' : 'none';
+
       const statusSel = document.getElementById('detail-status-select');
       statusSel.value = t.status;
 
@@ -1339,6 +1383,37 @@
     const res = await API.post('ticket/reopen', { ticket_id: currentTicket.ticket_id });
     if (res.success) { showToast('เปิด Ticket ใหม่แล้ว', 'success'); await loadTickets(); closeModal('ticket-detail-modal'); }
     else showToast(res.data?.error || 'เกิดข้อผิดพลาด', 'error');
+  }
+
+  // ── Delete Ticket (soft delete, IT_MANAGER only) ─────────────
+  function openDeleteTicketDialog() {
+    if (!currentTicket) return;
+    document.getElementById('delete-modal-ticket-id').textContent = currentTicket.ticket_id;
+    document.getElementById('delete-comment-input').value = '';
+    openModal('delete-ticket-modal');
+  }
+
+  async function confirmDeleteTicket() {
+    const comment = document.getElementById('delete-comment-input').value.trim();
+    if (!comment) { showToast('กรุณาระบุเหตุผลที่ลบ', 'warning'); return; }
+    if (!currentTicket) return;
+    showLoader('กำลังลบ Ticket...');
+    try {
+      const res = await API.post('ticket/delete', { ticket_id: currentTicket.ticket_id, comment });
+      if (res.success) {
+        showToast('ลบ Ticket แล้ว', 'success');
+        closeModal('delete-ticket-modal');
+        closeModal('ticket-detail-modal');
+        await loadTickets();
+      } else {
+        showToast('ลบไม่สำเร็จ: ' + (res.data?.error || 'กรุณาลองใหม่'), 'error');
+      }
+    } catch (e) {
+      showToast('เกิดข้อผิดพลาด', 'error');
+      console.error('confirmDeleteTicket error:', e);
+    } finally {
+      hideLoader();
+    }
   }
 
   // ── Resend Survey (IT Staff) ─────────────────────────────────
