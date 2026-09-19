@@ -344,7 +344,7 @@
       { icon: DASH_ICONS.ticket, label:'Ticket ทั้งหมด',   value: s.total,                bg:'var(--primary-light)', color:'var(--primary)',
         href:'tickets.html' },
       { icon: DASH_ICONS.clock,  label:'รอ Assign',         value: data.waiting_assign || 0, bg:'#f3e8fd', color:'var(--purple)',
-        href:'tickets.html?q=' + encodeURIComponent('pawapat@tcpharmachem.com') },
+        href:'tickets.html?assignee=unassigned' },
       { icon: DASH_ICONS.gear,   label:'กำลังดำเนินการ',    value: s.working,              bg:'#fef9e7', color:'var(--warning)',
         href:'tickets.html?status=' + encodeURIComponent('Working on it') },
       { icon: DASH_ICONS.warn,   label:'SLA Risk',          value: s.sla_risk,             bg:'#fff3e0', color:'var(--orange)',

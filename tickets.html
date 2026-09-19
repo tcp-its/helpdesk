@@ -537,6 +537,9 @@
   let allTickets = [];
   let currentTicket = null;
   let selectedScore = 0;
+  // [Feat 2026-09-19] true when landed via Dashboard's "รอ Assign" KPI card
+  // (?assignee=unassigned) — restricts the list to tickets with no assignee yet.
+  let filterUnassignedOnly = false;
 
   // [Feat] ประเภท Ticket + KPI Mapping — mirrors backend Config.js so the
   // inline "ประเภท" editor can show/save without a round-trip, and the
@@ -582,6 +585,11 @@
     if (urlParams.get('q')) {
       document.getElementById('search-input').value = urlParams.get('q');
       applyFilters();
+    }
+    if (urlParams.get('assignee') === 'unassigned') {
+      filterUnassignedOnly = true;
+      applyFilters();
+      showToast('กำลังกรองเฉพาะ Ticket ที่รอ Assign', 'info');
     }
   });
 
@@ -632,7 +640,7 @@
         <td class="fs-12">${t.ticket_type||'—'}</td>
         <td>${statusBadge(t.status)}</td>
         <td>${priorityBadge(t.priority)}</td>
-        <td class="fs-12">${t.assigned_name||'<span class="text-muted">—</span>'}</td>
+        <td class="fs-12">${t.assigned_name||'<span class="text-muted">รอ Assign</span>'}</td>
         <td>${slaText}</td>
         <td class="fs-12 text-muted">${timeAgo(t.created_at)}</td>
         <td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openTicketDetail('${t.ticket_id}')">รายละเอียด</button></td>
@@ -690,6 +698,7 @@
     const df   = parseDDMMYYYY(document.getElementById('filter-date-from').value);
     const dt   = parseDDMMYYYY(document.getElementById('filter-date-to').value);
     let result = allTickets.filter(t => {
+      if (filterUnassignedOnly && t.assigned_to) return false;
       if (kw && !JSON.stringify(t).toLowerCase().includes(kw)) return false;
       if (st && t.status !== st) return false;
       if (pr && t.priority !== pr) return false;
@@ -715,6 +724,7 @@
   }
 
   function clearFilters() {
+    filterUnassignedOnly = false;
     ['search-input','filter-status','filter-priority','filter-type','filter-date-from','filter-date-to']
       .forEach(id => document.getElementById(id).value = '');
     updateFilterBadge();
@@ -868,7 +878,7 @@
       <div class="detail-meta-item"><div class="detail-meta-label">ผู้แจ้ง</div><div class="detail-meta-value">${t.requester_name}</div></div>
       <div class="detail-meta-item"><div class="detail-meta-label">สร้างเมื่อ</div><div class="detail-meta-value">${formatDate(t.created_at)}</div></div>
       ${t.sla_deadline ? `<div class="detail-meta-item"><div class="detail-meta-label">SLA Deadline</div><div class="detail-meta-value" style="color:${new Date(t.sla_deadline)<new Date()?'var(--danger)':'var(--warning)'}">${formatDate(t.sla_deadline)}</div></div>` : ''}
-      ${t.assigned_name ? `<div class="detail-meta-item"><div class="detail-meta-label">ผู้รับผิดชอบ</div><div class="detail-meta-value">${t.assigned_name}</div></div>` : ''}
+      <div class="detail-meta-item"><div class="detail-meta-label">ผู้รับผิดชอบ</div><div class="detail-meta-value">${t.assigned_name || 'รอ Assign'}</div></div>
     `;
 
     // Description
@@ -1010,7 +1020,7 @@
       statusSel.value = t.status;
 
       const assignSel = document.getElementById('detail-assign-select');
-      assignSel.innerHTML = '<option value="">— เลือก IT Staff —</option>' +
+      assignSel.innerHTML = '<option value="">รอ Assign</option>' +
         staff.filter(s => s.role !== 'IT_MANAGER' || isManager()).map(s =>
           `<option value="${s.email}" ${s.email===t.assigned_to?'selected':''}>${s.display_name}</option>`
         ).join('');
