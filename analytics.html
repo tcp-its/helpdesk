@@ -551,16 +551,20 @@
       ? (done.filter(t=>t.sla_actual_hours>0).reduce((s,t)=>s+parseFloat(t.sla_actual_hours),0)/done.filter(t=>t.sla_actual_hours>0).length).toFixed(1)
       : '—';
 
-    // [Feat 2026-09-21] User ทั้งหมด (Active) — มาจาก data.users.total_active
-    // ที่ backend คำนวณไว้ใน buildAnalyticsData() ไม่ต้องคำนวณซ้ำฝั่ง frontend
-    const totalActiveUsers = (data.users && data.users.total_active != null) ? data.users.total_active : '—';
+    // [Feat 2026-09-21] User ลงทะเบียนแล้ว/เป้าหมายทั้งหมด — มาจาก
+    // data.users.total_active + data.users.target_total ที่ backend คำนวณไว้ใน
+    // buildAnalyticsData() แล้ว (เป้าหมายปรับได้ผ่านแท็บ System Config โดยไม่ต้อง
+    // แก้โค้ด เพราะจำนวนพนักงานเป้าหมายอาจเพิ่มขึ้นในอนาคต)
+    const totalActiveUsers = (data.users && data.users.total_active != null) ? data.users.total_active : null;
+    const targetTotalUsers = (data.users && data.users.target_total != null) ? data.users.target_total : null;
+    const userProgressVal  = (totalActiveUsers != null && targetTotalUsers != null) ? `${totalActiveUsers}/${targetTotalUsers}` : '—';
 
     document.getElementById('overview-kpis').innerHTML = [
       { icon:'🎫', label:'Ticket ทั้งหมด',   val: tickets.length,  color:'#1a73e8' },
       { icon:'✅', label:'เสร็จสิ้น',         val: done.length,     color:'#34a853' },
       { icon:'⏱️', label:'เวลาแก้ไขเฉลี่ย', val: avgTime+' ชม.',  color:'#f5a623' },
       { icon:'⭐', label:'ความพึงพอใจ',       val: avgSat+'/5',     color:'#ff9800' },
-      { icon:'👥', label:'User ทั้งหมด',      val: totalActiveUsers, color:'#9c27b0' },
+      { icon:'👥', label:'User ลงทะเบียนแล้ว', val: userProgressVal, color:'#9c27b0' },
     ].map(k=>`<div class="kpi-mini"><div class="kpi-mini-val" style="color:${k.color}">${k.val}</div><div class="kpi-mini-lbl">${k.icon} ${k.label}</div></div>`).join('');
 
     // Monthly Trend
@@ -630,7 +634,7 @@
       const ugData = new google.visualization.DataTable();
       ugData.addColumn('string', 'เดือน');
       ugData.addColumn('number', 'ลงทะเบียนใหม่');
-      ugData.addColumn('number', '% สะสมของทั้งหมด');
+      ugData.addColumn('number', '% เทียบเป้าหมาย');
       usersMonthly.forEach(m => ugData.addRow([m.month, m.new_count, m.cumulative_pct]));
       new google.visualization.ComboChart(document.getElementById('user-growth-chart')).draw(ugData, {
         seriesType: 'bars',
@@ -640,7 +644,7 @@
         hAxis: { textStyle: { fontSize: 10, color: isDark ? '#aaa' : '#666' } },
         vAxes: {
           0: { title: 'จำนวนใหม่ (คน)', minValue: 0, titleTextStyle: { fontSize: 11 }, textStyle: { fontSize: 10, color: isDark ? '#aaa' : '#666' }, gridlines: { color: isDark ? '#333' : '#f0f0f0' } },
-          1: { title: '% สะสม', minValue: 0, maxValue: 100, titleTextStyle: { fontSize: 11 }, textStyle: { fontSize: 10, color: isDark ? '#aaa' : '#666' }, gridlines: { color: 'transparent' } }
+          1: { title: '% เทียบเป้าหมาย', minValue: 0, maxValue: 100, titleTextStyle: { fontSize: 11 }, textStyle: { fontSize: 10, color: isDark ? '#aaa' : '#666' }, gridlines: { color: 'transparent' } }
         },
         backgroundColor: 'transparent',
         chartArea: { left: 55, right: 55, top: 10, bottom: 50 }
