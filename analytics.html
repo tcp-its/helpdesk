@@ -168,10 +168,11 @@
         </div>
 
         <!-- [Feat 2026-09-21] User Growth: จำนวน User ลงทะเบียนใหม่รายเดือน
-             (Active ทุก role) + ยอดสะสมคิดเป็น % ของ User ทั้งหมดปัจจุบัน -->
+             (Active ทุก role) + % ของเป้าหมายต่อเดือน + สรุปความคืบหน้ารวม -->
         <div style="display:grid;grid-template-columns:1fr;gap:20px;margin-top:20px">
           <div class="report-card">
             <h4>👥 User ลงทะเบียนใหม่รายเดือน (ย้อนหลัง 12 เดือน)</h4>
+            <div id="user-growth-summary" class="text-muted fs-13 mb-8"></div>
             <div id="user-growth-chart" style="height:260px"></div>
           </div>
         </div>
@@ -627,15 +628,26 @@
       });
     }
 
-    // User Growth: แท่ง = User ลงทะเบียนใหม่ต่อเดือน, เส้น = ยอดสะสมคิดเป็น %
-    // ของ User Active ทั้งหมดปัจจุบัน (data.users มาจาก backend โดยตรง)
+    // User Growth: แท่ง = User ลงทะเบียนใหม่ต่อเดือน, เส้น = % ใหม่ต่อเดือนเทียบเป้าหมาย
+    // (data.users มาจาก backend โดยตรง)
     const usersMonthly = (data.users && Array.isArray(data.users.monthly)) ? data.users.monthly : [];
+    const ugTotalActive = (data.users && data.users.total_active) || 0;
+    const ugTargetTotal = (data.users && data.users.target_total) || 0;
+    const ugSummaryEl = document.getElementById('user-growth-summary');
+    if (ugSummaryEl) {
+      if (ugTargetTotal > 0) {
+        const ugOverallPct = Math.round((ugTotalActive / ugTargetTotal) * 1000) / 10;
+        ugSummaryEl.textContent = `ลงทะเบียนแล้ว ${ugTotalActive} จาก ${ugTargetTotal} คน (${ugOverallPct}%)`;
+      } else {
+        ugSummaryEl.textContent = `ลงทะเบียนแล้ว ${ugTotalActive} คน`;
+      }
+    }
     if (usersMonthly.length) {
       const ugData = new google.visualization.DataTable();
       ugData.addColumn('string', 'เดือน');
       ugData.addColumn('number', 'ลงทะเบียนใหม่');
       ugData.addColumn('number', '% เทียบเป้าหมาย');
-      usersMonthly.forEach(m => ugData.addRow([m.month, m.new_count, m.cumulative_pct]));
+      usersMonthly.forEach(m => ugData.addRow([m.month, m.new_count, m.pct_of_target]));
       new google.visualization.ComboChart(document.getElementById('user-growth-chart')).draw(ugData, {
         seriesType: 'bars',
         series: { 1: { type: 'line', targetAxisIndex: 1, color: '#9c27b0', lineWidth: 3, pointSize: 5 } },
