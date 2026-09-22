@@ -77,6 +77,7 @@
         <div class="admin-tab" onclick="switchTab('sla-config',this)">⏱️ SLA Config</div>
         <div class="admin-tab" onclick="switchTab('holidays',this)">🗓️ วันหยุด</div>
         <div class="admin-tab" onclick="switchTab('sys-config',this)">🔧 System Config</div>
+        <div class="admin-tab" onclick="switchTab('worklog',this)">📋 บันทึกงานภายใน</div>
         <div class="admin-tab" onclick="switchTab('audit',this)">📜 Audit Log</div>
       </div>
 
@@ -186,6 +187,43 @@
         <div class="card">
           <div class="card-body" id="holiday-list">
             <div class="empty-state"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── INTERNAL WORK LOG (บันทึกงานภายใน) ──────────── -->
+      <!-- [Feat 2026-09-22] แยกจาก Tickets โดยสิ้นเชิง — ไม่นับรวมสถิติ Ticket/SLA/Kaizen ใดๆ -->
+      <div id="section-worklog" class="section">
+        <div class="d-flex justify-between align-center mb-16" style="flex-wrap:wrap;gap:10px">
+          <h3 class="fs-16">📋 บันทึกงานภายใน (Internal Work Log)</h3>
+          <div class="d-flex gap-8" style="flex-wrap:wrap;align-items:center">
+            <select class="form-control" id="wl-filter-category" style="width:170px" onchange="renderWorklog()">
+              <option value="">ทุกหมวดหมู่</option>
+              <option>🔧 แก้ไขระบบ</option>
+              <option>👤 งานของตนเอง</option>
+              <option>👥 มอบหมายให้ฟาน</option>
+              <option>➕ อื่นๆ</option>
+            </select>
+            <select class="form-control" id="wl-filter-status" style="width:140px" onchange="renderWorklog()">
+              <option value="">ทุกสถานะ</option>
+              <option>📝 To Do</option>
+              <option>🔄 กำลังทำ</option>
+              <option>✅ เสร็จแล้ว</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" id="btn-wl-summary" style="display:none" onclick="generateWeeklySummary()">🤖 สรุปสัปดาห์ (AI)</button>
+            <button class="btn btn-primary btn-sm" onclick="openWorklogModal()">➕ เพิ่มงาน</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr><th>ชื่องาน</th><th>หมวดหมู่</th><th>ผู้รับผิดชอบ</th><th>กำหนดส่ง</th><th>เลื่อนแล้ว</th><th>สถานะ</th><th>การดำเนินการ</th></tr>
+              </thead>
+              <tbody id="worklog-tbody">
+                <tr><td colspan="7" class="text-center" style="padding:40px"><div class="spinner" style="margin:0 auto 16px"></div>กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -447,6 +485,118 @@
   </div>
 </div>
 
+<!-- ── Internal Work Log Modal (Create / Edit) ───────────── -->
+<div class="modal-overlay" id="worklog-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="worklog-modal-title">📋 เพิ่มบันทึกงานภายใน</span>
+      <button class="modal-close" onclick="closeModal('worklog-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="wl-log-id">
+      <div class="form-group">
+        <label class="form-label">ชื่องาน <span class="required">*</span></label>
+        <input class="form-control" id="wl-title" placeholder="เช่น แก้ไขปัญหาปริ้นเตอร์ชั้น 3">
+      </div>
+      <div class="form-group">
+        <label class="form-label">หมวดหมู่ <span class="required">*</span></label>
+        <select class="form-control" id="wl-category">
+          <option>🔧 แก้ไขระบบ</option>
+          <option>👤 งานของตนเอง</option>
+          <option>👥 มอบหมายให้ฟาน</option>
+          <option>➕ อื่นๆ</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">รายละเอียด</label>
+        <textarea class="form-control" id="wl-description" rows="3" placeholder="รายละเอียดงาน (ไม่บังคับ)"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">ผู้รับผิดชอบ <span class="required">*</span></label>
+        <select class="form-control" id="wl-assigned-to"></select>
+      </div>
+      <div class="form-group" id="wl-due-date-group">
+        <label class="form-label">กำหนดส่ง <span class="required">*</span></label>
+        <input type="text" class="form-control" id="wl-due-date" placeholder="DD/MM/YYYY" maxlength="10" oninput="formatDateInput(this)">
+      </div>
+      <div class="form-group" id="wl-status-group" style="display:none">
+        <label class="form-label">สถานะ</label>
+        <select class="form-control" id="wl-status">
+          <option>📝 To Do</option>
+          <option>🔄 กำลังทำ</option>
+          <option>✅ เสร็จแล้ว</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ticket ที่เกี่ยวข้อง (ถ้ามี)</label>
+        <input class="form-control" id="wl-linked-ticket" placeholder="เช่น TCP-2026-0042">
+      </div>
+      <div class="alert alert-warning" id="wl-reschedule-hint" style="display:none;font-size:12px">
+        ⚠️ การแก้ไขนี้เปลี่ยนกำหนดส่งไม่ได้ — ใช้ปุ่ม "🔁 เลื่อนกำหนด" ในตารางแทน เพื่อให้ประวัติการเลื่อนถูกบันทึกไว้ครบ
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('worklog-modal')">ยกเลิก</button>
+      <button class="btn btn-primary"   onclick="saveWorklogItem()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Internal Work Log Modal (Reschedule) ──────────────── -->
+<div class="modal-overlay" id="worklog-reschedule-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">🔁 เลื่อนกำหนดส่ง</span>
+      <button class="modal-close" onclick="closeModal('worklog-reschedule-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="wl-resched-log-id">
+      <div class="form-group">
+        <div class="form-label" style="font-size:11px">งาน</div>
+        <div class="fw-600" id="wl-resched-title">—</div>
+      </div>
+      <div class="form-group">
+        <div class="form-label" style="font-size:11px">กำหนดส่งเดิม</div>
+        <div id="wl-resched-old-date">—</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">กำหนดส่งใหม่ <span class="required">*</span></label>
+        <input type="text" class="form-control" id="wl-resched-new-date" placeholder="DD/MM/YYYY" maxlength="10" oninput="formatDateInput(this)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">เหตุผลที่เลื่อน <span class="required">*</span></label>
+        <textarea class="form-control" id="wl-resched-reason" rows="2" placeholder="เช่น รองานอะไหล่จากผู้ขาย"></textarea>
+      </div>
+      <div class="form-group" id="wl-resched-history-wrap" style="display:none">
+        <div class="form-label" style="font-size:11px">ประวัติการเลื่อนกำหนด</div>
+        <div id="wl-resched-history" style="font-size:12px;color:var(--text-secondary)"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('worklog-reschedule-modal')">ยกเลิก</button>
+      <button class="btn btn-primary"   onclick="saveReschedule()">💾 บันทึกการเลื่อน</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Internal Work Log Modal (Weekly AI Summary) ───────── -->
+<div class="modal-overlay" id="worklog-summary-modal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <span class="modal-title">🤖 สรุปงานภายในรายสัปดาห์</span>
+      <button class="modal-close" onclick="closeModal('worklog-summary-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="wl-summary-body">
+        <div class="empty-state"><div class="spinner"></div>กำลังสรุปด้วย AI...</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('worklog-summary-modal')">ปิด</button>
+    </div>
+  </div>
+</div>
+
 <script src="assets/js/app.js"></script>
 <script>
   // ── Auth Guard (Manager only) ───────────────────────────────
@@ -469,6 +619,11 @@
   window.addEventListener('load', async () => {
     await Promise.all([ loadUsers(), loadFAQs(), loadAuditLog(), loadKBPending(), loadSysConfig() ]);
     loadHolidays();
+    loadWorklog();
+    if (isManager()) {
+      const btnWlSum = document.getElementById('btn-wl-summary');
+      if (btnWlSum) btnWlSum.style.display = '';
+    }
   });
 
   // ── Tab Switch ──────────────────────────────────────────────
@@ -881,6 +1036,212 @@
   async function loadMoreAudit() {
     auditLimit += 100;
     await loadAuditLog();
+  }
+
+  // ── INTERNAL WORK LOG (บันทึกงานภายใน) ──────────────────────
+  // [Feat 2026-09-22] แยกจาก Tickets โดยสิ้นเชิง — ห้ามนำไปรวมกับสถิติ
+  // Ticket/SLA/Kaizen ใดๆ ทั้งสิ้น (ดู WorklogManager.gs / NotificationEngine.gs)
+  let allWorklog = [];
+
+  const WL_COLOR_BG = { '🔴':'#fce8e6', '🟡':'#fff3e0', '🟢':'#e6f4ea', '':'#f5f5f5' };
+  const WL_COLOR_FG = { '🔴':'#c62828', '🟡':'#e65100', '🟢':'#137333', '':'#999' };
+
+  function wlStatusColor(item) {
+    if (!item.due_date || item.status === '✅ เสร็จแล้ว') return '';
+    const today = new Date(new Date().toLocaleDateString('en-US', {timeZone:'Asia/Bangkok'}));
+    const due   = new Date(String(item.due_date).substring(0,10) + 'T00:00:00');
+    if (isNaN(due.getTime())) return '';
+    const diffDays = Math.round((due - today) / 86400000);
+    if (diffDays < 0) return '🔴';
+    if (diffDays <= 1) return '🟡';
+    return '🟢';
+  }
+
+  async function loadWorklog() {
+    const res = await API.get('worklog/list');
+    allWorklog = res.success ? res.data : [];
+    renderWorklog();
+  }
+
+  function renderWorklog() {
+    const catFilter = document.getElementById('wl-filter-category')?.value || '';
+    const stFilter  = document.getElementById('wl-filter-status')?.value || '';
+    let items = allWorklog;
+    if (catFilter) items = items.filter(w => w.category === catFilter);
+    if (stFilter)  items = items.filter(w => w.status === stFilter);
+
+    // เรียงงานที่ยังไม่เสร็จและใกล้/เลยกำหนดไว้บนสุด
+    items = items.slice().sort((a,b) => {
+      const order = { '🔴':0, '🟡':1, '🟢':2, '':3 };
+      return order[wlStatusColor(a)] - order[wlStatusColor(b)];
+    });
+
+    document.getElementById('worklog-tbody').innerHTML = items.length ? items.map(w => {
+      const color   = wlStatusColor(w);
+      const bg      = WL_COLOR_BG[color];
+      const fg      = WL_COLOR_FG[color];
+      const canDelete = isManager();
+      return `
+      <tr>
+        <td><div class="fw-600 fs-13">${w.title}</div>${w.linked_ticket_id?`<div class="text-muted fs-11">🎫 ${w.linked_ticket_id}</div>`:''}</td>
+        <td class="fs-12">${w.category||'—'}</td>
+        <td class="fs-12">${(allUsers.find(u=>u.email===w.assigned_to)||{}).display_name || w.assigned_to || '—'}</td>
+        <td><span class="badge" style="background:${bg};color:${fg}">${color?color+' ':''}${w.due_date||'—'}</span></td>
+        <td>${w.reschedule_count ? `<span class="badge" style="background:#fff3e0;color:#e65100">${w.reschedule_count} ครั้ง</span>` : '<span class="text-muted fs-12">—</span>'}</td>
+        <td class="fs-12">${w.status||'—'}</td>
+        <td>
+          <div class="d-flex gap-8">
+            <button class="btn-icon" title="แก้ไข" onclick="openWorklogModal('${w.log_id}')">✏️</button>
+            <button class="btn-icon" title="เลื่อนกำหนด" onclick="openRescheduleModal('${w.log_id}')">🔁</button>
+            ${canDelete ? `<button class="btn-icon" title="ลบ" onclick="deleteWorklogItem('${w.log_id}')">🗑️</button>` : ''}
+          </div>
+        </td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="7" class="text-center" style="padding:40px"><div class="empty-state"><div class="empty-icon">📋</div><h3>ยังไม่มีบันทึกงาน</h3></div></td></tr>';
+  }
+
+  function _wlPopulateAssigneeOptions(selectedEmail) {
+    const sel = document.getElementById('wl-assigned-to');
+    const staff = allUsers.filter(u => u.role === 'IT_STAFF' || u.role === 'IT_MANAGER');
+    const canAssignOthers = isManager();
+    const options = canAssignOthers ? staff : staff.filter(u => u.email === getCurrentUser().email);
+    sel.innerHTML = options.map(u => `<option value="${u.email}">${u.display_name||u.email}</option>`).join('');
+    sel.value = selectedEmail || getCurrentUser().email;
+    sel.disabled = !canAssignOthers && options.length <= 1;
+  }
+
+  function openWorklogModal(logId) {
+    const item = logId ? allWorklog.find(w => w.log_id === logId) : null;
+    document.getElementById('wl-log-id').value = item ? item.log_id : '';
+    document.getElementById('worklog-modal-title').textContent = item ? '✏️ แก้ไขบันทึกงานภายใน' : '📋 เพิ่มบันทึกงานภายใน';
+    document.getElementById('wl-title').value = item ? item.title : '';
+    document.getElementById('wl-category').value = item ? item.category : '🔧 แก้ไขระบบ';
+    document.getElementById('wl-description').value = item ? (item.description||'') : '';
+    document.getElementById('wl-linked-ticket').value = item ? (item.linked_ticket_id||'') : '';
+    _wlPopulateAssigneeOptions(item ? item.assigned_to : null);
+
+    // due_date แก้ไขได้เฉพาะตอนสร้างใหม่ — ตอนแก้ไขต้องผ่านปุ่มเลื่อนกำหนดเท่านั้น
+    document.getElementById('wl-due-date-group').style.display = item ? 'none' : '';
+    document.getElementById('wl-due-date').value = item ? '' : '';
+    document.getElementById('wl-reschedule-hint').style.display = item ? '' : 'none';
+
+    document.getElementById('wl-status-group').style.display = item ? '' : 'none';
+    if (item) document.getElementById('wl-status').value = item.status;
+
+    openModal('worklog-modal');
+  }
+
+  async function saveWorklogItem() {
+    const logId = document.getElementById('wl-log-id').value;
+    const title  = document.getElementById('wl-title').value.trim();
+    if (!title) { showToast('กรุณากรอกชื่องาน','warning'); return; }
+
+    showLoader('กำลังบันทึก...');
+    try {
+      let res;
+      if (logId) {
+        res = await API.post('worklog/update', {
+          id: logId,
+          title: title,
+          category: document.getElementById('wl-category').value,
+          description: document.getElementById('wl-description').value,
+          assigned_to: document.getElementById('wl-assigned-to').value,
+          status: document.getElementById('wl-status').value,
+          linked_ticket_id: document.getElementById('wl-linked-ticket').value
+        });
+      } else {
+        const rawDate = document.getElementById('wl-due-date').value;
+        const parsedDate = parseDDMMYYYY(rawDate);
+        if (!parsedDate) { showToast('กรุณากรอกกำหนดส่งในรูปแบบ DD/MM/YYYY','warning'); hideLoader(); return; }
+        const dueDate = parsedDate.getFullYear() + '-' +
+                        String(parsedDate.getMonth()+1).padStart(2,'0') + '-' +
+                        String(parsedDate.getDate()).padStart(2,'0');
+        res = await API.post('worklog/create', {
+          title: title,
+          category: document.getElementById('wl-category').value,
+          description: document.getElementById('wl-description').value,
+          assigned_to: document.getElementById('wl-assigned-to').value,
+          due_date: dueDate,
+          linked_ticket_id: document.getElementById('wl-linked-ticket').value
+        });
+      }
+      if (res.success) { showToast('บันทึกสำเร็จ','success'); closeModal('worklog-modal'); await loadWorklog(); }
+      else showToast(res.data?.error||'เกิดข้อผิดพลาด','error');
+    } catch(e) { showToast('เกิดข้อผิดพลาด','error'); }
+    finally { hideLoader(); }
+  }
+
+  async function openRescheduleModal(logId) {
+    const item = allWorklog.find(w => w.log_id === logId);
+    if (!item) return;
+    document.getElementById('wl-resched-log-id').value = item.log_id;
+    document.getElementById('wl-resched-title').textContent = item.title;
+    document.getElementById('wl-resched-old-date').textContent = item.due_date || '—';
+    document.getElementById('wl-resched-new-date').value = '';
+    document.getElementById('wl-resched-reason').value = '';
+
+    const histWrap = document.getElementById('wl-resched-history-wrap');
+    const histEl   = document.getElementById('wl-resched-history');
+    histWrap.style.display = 'none';
+    openModal('worklog-reschedule-modal');
+
+    const res = await API.get('worklog/reschedule-history', { id: logId });
+    if (res.success && res.data && res.data.length) {
+      histEl.innerHTML = res.data.map(h =>
+        `• ${h.old_due_date||'—'} → ${h.new_due_date||'—'} (${h.reason||'ไม่ระบุเหตุผล'})`
+      ).join('<br>');
+      histWrap.style.display = '';
+    }
+  }
+
+  async function saveReschedule() {
+    const logId = document.getElementById('wl-resched-log-id').value;
+    const rawDate = document.getElementById('wl-resched-new-date').value;
+    const parsedDate = parseDDMMYYYY(rawDate);
+    if (!parsedDate) { showToast('กรุณากรอกกำหนดส่งใหม่ในรูปแบบ DD/MM/YYYY','warning'); return; }
+    const reason = document.getElementById('wl-resched-reason').value.trim();
+    if (!reason) { showToast('กรุณาระบุเหตุผลที่เลื่อนกำหนด','warning'); return; }
+    const dueDate = parsedDate.getFullYear() + '-' +
+                    String(parsedDate.getMonth()+1).padStart(2,'0') + '-' +
+                    String(parsedDate.getDate()).padStart(2,'0');
+
+    showLoader('กำลังบันทึก...');
+    try {
+      const res = await API.post('worklog/reschedule', { id: logId, due_date: dueDate, reason: reason });
+      if (res.success) { showToast('เลื่อนกำหนดสำเร็จ','success'); closeModal('worklog-reschedule-modal'); await loadWorklog(); }
+      else showToast(res.data?.error||'เกิดข้อผิดพลาด','error');
+    } catch(e) { showToast('เกิดข้อผิดพลาด','error'); }
+    finally { hideLoader(); }
+  }
+
+  async function deleteWorklogItem(logId) {
+    if (!confirm('ยืนยันการลบบันทึกงานนี้? การลบไม่สามารถย้อนกลับได้')) return;
+    showLoader('กำลังลบ...');
+    try {
+      const res = await API.post('worklog/delete', { id: logId });
+      if (res.success) { showToast('ลบสำเร็จ','success'); await loadWorklog(); }
+      else showToast(res.data?.error||'เกิดข้อผิดพลาด','error');
+    } catch(e) { showToast('เกิดข้อผิดพลาด','error'); }
+    finally { hideLoader(); }
+  }
+
+  async function generateWeeklySummary() {
+    openModal('worklog-summary-modal');
+    document.getElementById('wl-summary-body').innerHTML = '<div class="empty-state"><div class="spinner"></div>กำลังสรุปด้วย AI...</div>';
+    const res = await API.post('worklog/weekly-summary', {});
+    if (!res.success) {
+      document.getElementById('wl-summary-body').innerHTML = `<div class="alert alert-warning">${res.data?.error||'เกิดข้อผิดพลาด'}</div>`;
+      return;
+    }
+    const stats = res.data.stats || {};
+    document.getElementById('wl-summary-body').innerHTML = `
+      <div class="d-flex gap-8 mb-16" style="flex-wrap:wrap">
+        <span class="badge" style="background:#e6f4ea;color:#137333">✅ เสร็จสัปดาห์นี้ ${(stats.done_this_week||[]).length}</span>
+        <span class="badge" style="background:#e8f0fe;color:#1a73e8">📝 ค้างอยู่ ${(stats.still_open||[]).length}</span>
+        <span class="badge" style="background:#fce8e6;color:#c62828">🔴 เลยกำหนด ${(stats.overdue||[]).length}</span>
+      </div>
+      <div style="white-space:pre-line;font-size:13px;line-height:1.7">${res.data.summary||'—'}</div>
+    `;
   }
 </script>
 </body>
