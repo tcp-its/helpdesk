@@ -487,6 +487,7 @@
   <a href="#welcome">🏠 เริ่มต้น</a>
   <a href="#register">➕ เพิ่มเพื่อน</a>
   <a href="#features">⚙️ ฟีเจอร์หลัก</a>
+  <a href="#tips">💡 เคล็ดลับ</a>
   <a href="#web">🖥️ เปิดผ่านเว็บ</a>
   <a href="#richmenu">📋 Rich Menu</a>
   <a href="#emergency">📞 ฉุกเฉิน</a>
@@ -590,7 +591,7 @@
           <div class="step-body">
             <h3>รับข้อความต้อนรับ 🎉</h3>
             <p>ระบบจะส่งข้อความต้อนรับพร้อม <strong>Rich Menu</strong> (แถบเมนูด้านล่าง) ปรากฏขึ้นอัตโนมัติ พร้อมใช้งานได้ทันที</p>
-            <div class="step-tip green">✅ เพิ่มเพื่อนสำเร็จแล้ว! ไม่ต้องสมัครหรือกรอกข้อมูลเพิ่มเติมใดๆ</div>
+            <div class="step-tip green">✅ เพิ่มเพื่อนสำเร็จแล้ว! ไม่ต้องกรอกฟอร์มใดๆ ล่วงหน้า — ระบบจะขอชื่อ-นามสกุลและแผนกของคุณอัตโนมัติในครั้งแรกที่คุณพิมพ์แจ้งปัญหาหรือกด "เปิด Ticket" (ถามครั้งเดียว)</div>
           </div>
         </div>
       </div>
@@ -636,6 +637,14 @@
         <div>
           <div style="font-size:18px;font-weight:800">ก. แจ้งปัญหา ITS (เปิด Ticket)</div>
           <div style="font-size:13px;color:var(--text-sec)">ใช้เมื่อมีปัญหาที่ต้องการให้ทีม ITS มาช่วย</div>
+        </div>
+      </div>
+
+      <div class="info-box" style="margin-bottom:20px">
+        <span class="info-box-icon">💬</span>
+        <div class="info-box-text">
+          เปิด Ticket ได้ 2 แบบ: (1) กด <strong>"แจ้งปัญหา"</strong> แล้วกรอกทีละขั้นตามด้านล่าง หรือ (2) <strong>คุยปัญหากับ AI ก่อน</strong> (ดูหัวข้อ "คุยกับ AI ได้อิสระ" ด้านล่าง) แล้วพิมพ์ <strong>"เปิด ticket"</strong> — AI จะสรุปบทสนทนาให้อัตโนมัติ ไม่ต้องพิมพ์รายละเอียดซ้ำ<br>
+          <span style="font-size:13px;color:var(--text-muted)">หมายเหตุ: ถ้าเป็นการแจ้งปัญหาครั้งแรก ระบบจะขอชื่อ-นามสกุลและแผนกก่อน (ถามครั้งเดียว ครั้งต่อไปไม่ต้องกรอกซ้ำ)</span>
         </div>
       </div>
 
@@ -791,12 +800,12 @@
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
         <div style="width:48px;height:48px;background:var(--yellow-light);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px">💡</div>
         <div>
-          <div style="font-size:18px;font-weight:800">ค. ถามตอบ FAQ อัจฉริยะ</div>
-          <div style="font-size:13px;color:var(--text-sec)">แก้ปัญหาด้วยตัวเองโดยไม่ต้องรอทีม ITS</div>
+          <div style="font-size:18px;font-weight:800">ค. คุยกับ AI ได้อิสระ + FAQ อัจฉริยะ</div>
+          <div style="font-size:13px;color:var(--text-sec)">พิมพ์คุยได้เหมือนคุยกับคนจริง ไม่ต้องจำคำสั่ง</div>
         </div>
       </div>
 
-      <p style="font-size:14px;color:var(--text-sec);margin-bottom:20px">แค่พิมพ์คำถามของคุณเป็นภาษาธรรมดา AI จะตอบคำถามที่พบบ่อยได้ทันที เช่น:</p>
+      <p style="font-size:14px;color:var(--text-sec);margin-bottom:20px">แค่พิมพ์คำถามหรือเล่าปัญหาของคุณเป็นภาษาธรรมดา AI จะตอบคำถามที่พบบ่อยได้ทันที และคุยต่อเนื่องได้เรื่อยๆ เช่น:</p>
 
       <div class="faq-item">
         <button class="faq-q" onclick="toggleFaq(this)">
@@ -835,6 +844,77 @@
         <div class="info-box-text">
           <strong>AI ตอบไม่ได้? ไม่เป็นไร!</strong> ถ้า AI ตอบคำถามของคุณไม่ได้ ระบบจะถามว่าต้องการเปิด Ticket ให้ทีม ITS ช่วยไหม — กดยืนยันได้เลยครับ
         </div>
+      </div>
+
+      <div class="info-box" style="margin-top:12px">
+        <span class="info-box-icon">🎫</span>
+        <div class="info-box-text">
+          <strong>คุยจบแล้วอยากเปิด Ticket เลย?</strong> พิมพ์ <strong>"เปิด ticket"</strong> ได้ทันที — AI จะสรุปบทสนทนาทั้งหมดให้อัตโนมัติ ให้คุณตรวจสอบก่อนกด "✅ ถูกต้อง" หรือแก้ไขเองก่อนยืนยันก็ได้
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ══════════════════════════════════════════════
+     SECTION TIPS — เคล็ดลับการใช้งาน & คำสั่งลัด
+══════════════════════════════════════════════ -->
+<section id="tips">
+  <div class="container">
+    <div class="section-label green">💡 เพิ่มเติม</div>
+    <h2 class="section-title">เคล็ดลับการใช้งาน &amp; คำสั่งลัดที่ควรรู้</h2>
+    <p class="section-desc">จำไว้ไม่กี่ข้อ ใช้งานได้เร็วและลื่นไหลขึ้นมาก</p>
+
+    <div class="card" style="margin-bottom:20px">
+      <div style="font-size:15px;font-weight:700;margin-bottom:14px">⌨️ คำสั่งพิมพ์ลัด (พิมพ์ได้ทุกเมื่อ ไม่ต้องรอเมนู)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="background:var(--bg);border-radius:10px;padding:12px 14px">
+          <span class="tag">ยกเลิก / cancel</span>
+          <div style="font-size:13px;color:var(--text-sec);margin-top:6px">ล้างขั้นตอนที่ทำค้างอยู่ทันที เริ่มเรื่องใหม่ได้เลย — ใช้ได้แม้กำลังกรอกฟอร์มเปิด Ticket อยู่</div>
+        </div>
+        <div style="background:var(--bg);border-radius:10px;padding:12px 14px">
+          <span class="tag green">เปิด ticket / new ticket</span>
+          <div style="font-size:13px;color:var(--text-sec);margin-top:6px">เปิด Ticket ใหม่ — ถ้าเพิ่งคุยปัญหากับ AI ค้างอยู่ ระบบจะสรุปบทสนทนาให้อัตโนมัติ</div>
+        </div>
+        <div style="background:var(--bg);border-radius:10px;padding:12px 14px">
+          <span class="tag orange">ดู ticket / สถานะ / status</span>
+          <div style="font-size:13px;color:var(--text-sec);margin-top:6px">เช็คสถานะ Ticket ทั้งหมดของฉัน</div>
+        </div>
+        <div style="background:var(--bg);border-radius:10px;padding:12px 14px">
+          <span class="tag">เมนู / menu</span>
+          <div style="font-size:13px;color:var(--text-sec);margin-top:6px">กลับสู่เมนูหลัก (Rich Menu) พร้อมล้างขั้นตอนที่ค้างอยู่</div>
+        </div>
+        <div style="background:var(--bg);border-radius:10px;padding:12px 14px">
+          <span class="tag">คำถามที่พบบ่อย / faq</span>
+          <div style="font-size:13px;color:var(--text-sec);margin-top:6px">เข้าสู่โหมดถามตอบ FAQ อัจฉริยะ</div>
+        </div>
+        <div style="background:var(--bg);border-radius:10px;padding:12px 14px">
+          <span class="tag">ติดต่อทีมไอที / contact it</span>
+          <div style="font-size:13px;color:var(--text-sec);margin-top:6px">ดูช่องทางติดต่อทีม ITS โดยตรง</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-box orange">
+      <span class="info-box-icon">🚦</span>
+      <div class="info-box-text">
+        <strong>บอทไม่ตอบ หรือค้างอยู่ที่ข้อความเดิมนานผิดปกติ?</strong> พิมพ์ <strong>"ยกเลิก"</strong> แล้วพิมพ์คำถาม/ปัญหาใหม่อีกครั้งได้เลย วิธีนี้ช่วยล้าง Session ที่อาจติดค้างอยู่ได้ทันที และเปลี่ยนเรื่องคุยได้ตลอดเวลาโดยไม่ต้องรอ
+      </div>
+    </div>
+
+    <div class="info-box" style="margin-top:16px">
+      <span class="info-box-icon">⏳</span>
+      <div class="info-box-text">
+        <strong>ไม่ได้คุยนานเกิน 1 ชั่วโมง?</strong> ระบบจะล้างบทสนทนาที่ค้างอยู่ให้อัตโนมัติ (Ticket ที่เปิดไปแล้วยังอยู่ครบ ไม่หายไปไหน) แค่พิมพ์คุยใหม่ได้ตามปกติ
+      </div>
+    </div>
+
+    <div class="info-box green" style="margin-top:16px">
+      <span class="info-box-icon">🗣️</span>
+      <div class="info-box-text">
+        <strong>ไม่ต้องพิมพ์คำสั่งตายตัวก็ได้</strong> — เล่าปัญหาเป็นประโยคธรรมดาได้เลย เช่น "ปริ้นเตอร์ชั้น 3 พิมพ์ไม่ออก" AI จะเข้าใจและช่วยตอบให้ ถ้าตอบไม่ได้จริงๆ ค่อยพิมพ์ "เปิด ticket" เพื่อส่งต่อให้ทีม ITS
       </div>
     </div>
   </div>
@@ -1180,7 +1260,7 @@
   <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:4px">TCP Smart IT Desk</div>
   <div style="margin-bottom:4px">ระบบ ITS Helpdesk อัจฉริยะ · บริษัท ทีซี ฟาร์มา เคม จำกัด</div>
   <div style="margin-bottom:12px;font-size:13px">LINE: <span style="color:#22C55E;font-weight:700">@564vxpjw</span> · 📞 061-870-5432</div>
-  <div style="font-size:12px;opacity:.6">คู่มือฉบับนี้จัดทำโดยทีม ITS · อัปเดตล่าสุด สิงหาคม 2569</div>
+  <div style="font-size:12px;opacity:.6">คู่มือฉบับนี้จัดทำโดยทีม ITS · อัปเดตล่าสุด กันยายน 2569</div>
 </footer>
 
 <script>
