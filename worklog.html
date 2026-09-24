@@ -8,7 +8,17 @@
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/main.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <style>
+    /* ── หมวดหมู่งานภายใน (Print view สำหรับ Export PDF) — [Feat 2026-09-24] ──
+       ซ่อนทุกอย่างยกเว้นตาราง WorkLog ตอนสั่งพิมพ์/บันทึกเป็น PDF ─────── */
+    @media print {
+      .sidebar, .app-header, .header-actions, #wl-actions-row, #worklog-dashboard-card,
+      .modal-overlay, #wl-print-hide { display:none !important; }
+      .main-content { margin:0 !important; }
+      .page-content { padding:0 !important; }
+      table th:last-child, table td:last-child { display:none; }
+    }
     /* ── Flatpickr Overrides (คัดลอกจาก analytics.html เพื่อความสม่ำเสมอ) ── */
     .flatpickr-input { cursor:pointer; }
     .flatpickr-months .flatpickr-month,
@@ -89,13 +99,9 @@
       <div id="section-worklog">
         <div class="d-flex justify-between align-center mb-16" style="flex-wrap:wrap;gap:10px">
           <h3 class="fs-16">📋 บันทึกงานภายใน (Internal Work Log)</h3>
-          <div class="d-flex gap-8" style="flex-wrap:wrap;align-items:center">
+          <div class="d-flex gap-8" id="wl-actions-row" style="flex-wrap:wrap;align-items:center">
             <select class="form-control" id="wl-filter-category" style="width:170px" onchange="renderWorklog()">
               <option value="">ทุกหมวดหมู่</option>
-              <option>🔧 แก้ไขระบบ</option>
-              <option>👤 งานของตนเอง</option>
-              <option>👥 มอบหมายให้ฟาน</option>
-              <option>➕ อื่นๆ</option>
             </select>
             <select class="form-control" id="wl-filter-status" style="width:140px" onchange="renderWorklog()">
               <option value="">ทุกสถานะ</option>
@@ -103,9 +109,26 @@
               <option>🔄 กำลังทำ</option>
               <option>✅ เสร็จแล้ว</option>
             </select>
+            <button class="btn btn-secondary btn-sm" onclick="exportWorklogExcel()">📥 Excel</button>
+            <button class="btn btn-secondary btn-sm" onclick="exportWorklogPDF()">🖨️ PDF</button>
+            <button class="btn btn-secondary btn-sm" id="btn-wl-categories" style="display:none" onclick="openCategoryManageModal()">⚙️ จัดการหมวดหมู่</button>
             <button class="btn btn-secondary btn-sm" id="btn-wl-summary" style="display:none" onclick="generateWeeklySummary()">🤖 สรุปสัปดาห์ (AI)</button>
             <button class="btn btn-primary btn-sm" onclick="openWorklogModal()">➕ เพิ่มงาน</button>
           </div>
+        </div>
+
+        <!-- ── ข้อ 4: Dashboard วิเคราะห์งานภายในแยกตามหมวดหมู่ ─────────────
+             [Feat 2026-09-24] นับจำนวนงานต่อหมวดหมู่ (ไม่ใช่ชั่วโมงจริง —
+             ไม่มีฟิลด์บันทึกเวลาทำงาน) สีแต่ละหมวดยึดตามตำแหน่งใน "รายการ
+             หมวดหมู่หลัก" เสมอ (ไม่ใช่ตามลำดับที่กรองเห็น) เพื่อไม่ให้สี
+             ของหมวดเดิมเปลี่ยนไปมาเวลากรอง — ดู dataviz skill: "color follows
+             the entity, never its rank" ── -->
+        <div class="card mb-16" id="worklog-dashboard-card">
+          <div class="d-flex justify-between align-center mb-8" style="flex-wrap:wrap;gap:8px">
+            <h3 class="fs-14">📊 วิเคราะห์งานภายใน — จำนวนงานต่อหมวดหมู่</h3>
+            <span class="text-muted fs-12" id="wl-dash-highlight"></span>
+          </div>
+          <div id="worklog-category-chart" style="width:100%;height:260px"></div>
         </div>
         <div class="card">
           <div class="table-wrapper">
@@ -140,12 +163,16 @@
       </div>
       <div class="form-group">
         <label class="form-label">หมวดหมู่ <span class="required">*</span></label>
-        <select class="form-control" id="wl-category">
-          <option>🔧 แก้ไขระบบ</option>
-          <option>👤 งานของตนเอง</option>
-          <option>👥 มอบหมายให้ฟาน</option>
-          <option>➕ อื่นๆ</option>
-        </select>
+        <select class="form-control" id="wl-category"></select>
+      </div>
+      <!-- [Feat 2026-09-24] แนบไฟล์ได้ทั้งตอนสร้างและตอนแก้ไขภายหลัง — ใช้กติกา
+           ไฟล์เดียวกับ Ticket (นามสกุล/ขนาดไฟล์) ทุกอย่าง ดู attachWorklogFile() -->
+      <div class="form-group">
+        <label class="form-label">ไฟล์แนบ</label>
+        <input type="file" class="form-control" id="wl-attachment-input" multiple
+          accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.log">
+        <div class="text-muted fs-11 mt-8">รองรับ: รูปภาพ, เอกสาร Office, PDF, CSV/ข้อความ/Log (ไม่เกิน 10MB/ไฟล์)</div>
+        <div id="wl-attachment-list" class="d-flex gap-8 mt-8" style="flex-wrap:wrap"></div>
       </div>
       <div class="form-group">
         <label class="form-label">รายละเอียด</label>
@@ -237,6 +264,77 @@
   </div>
 </div>
 
+
+<!-- ── Internal Work Log Modal (Chat — private ผู้รับผิดชอบ+IT_MANAGER) ──── -->
+<!-- [Feat 2026-09-24] ไม่มี real-time push (Apps Script ไม่มี WebSocket) —
+     รีเฟรชเป็นช่วงๆ (poll) ตอนเปิดหน้าต่างนี้ค้างไว้แทน ดู openWorklogChatModal() -->
+<div class="modal-overlay" id="worklog-chat-modal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <span class="modal-title">💬 พูดคุยเกี่ยวกับงานนี้</span>
+      <button class="modal-close" onclick="closeWorklogChatModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="fw-600 fs-13 mb-8" id="wl-chat-title">—</div>
+      <div id="wl-chat-messages" style="max-height:320px;overflow-y:auto;padding:4px"></div>
+    </div>
+    <div class="modal-footer" style="flex-direction:column;align-items:stretch;gap:8px">
+      <textarea class="form-control" id="wl-chat-input" rows="2" placeholder="พิมพ์ข้อความ... (Enter เพื่อส่ง, Shift+Enter ขึ้นบรรทัดใหม่)"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendWorklogComment();}"></textarea>
+      <div class="d-flex justify-between">
+        <button class="btn btn-secondary" onclick="closeWorklogChatModal()">ปิด</button>
+        <button class="btn btn-primary" onclick="sendWorklogComment()">ส่ง</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Internal Work Log Modal (จัดการหมวดหมู่ — IT_MANAGER เท่านั้น) ──── -->
+<!-- [Feat 2026-09-24] ข้อ 5: หมวดหมู่เดิมตายตัวในโค้ด (CONFIG.WORKLOG_CATEGORY,
+     Config.js) แก้ไขในชีตตรงๆ ไม่มีผล — ย้ายมาเก็บใน SYSTEM_CONFIGURATION
+     ผ่าน API worklog/categories* แล้ว จัดการได้จากปุ่มนี้เลย -->
+<div class="modal-overlay" id="worklog-category-modal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <span class="modal-title">⚙️ จัดการหมวดหมู่งานภายใน</span>
+      <button class="modal-close" onclick="closeModal('worklog-category-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="wl-category-list" style="margin-bottom:16px"></div>
+      <div class="form-group">
+        <label class="form-label">เพิ่มหมวดหมู่ใหม่</label>
+        <div class="d-flex gap-8">
+          <input class="form-control" id="wl-new-category-name" placeholder="เช่น 🖥️ งานเซิร์ฟเวอร์">
+          <button class="btn btn-primary btn-sm" onclick="addWorklogCategoryUI()">➕ เพิ่ม</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('worklog-category-modal')">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Internal Work Log Modal (ประวัติการแก้ไขทั้งหมด) ──────────────── -->
+<!-- [Feat 2026-09-24] ข้อ 7d: ใช้ getAuditLogForEntity() ที่มีอยู่แล้วในระบบ
+     (Audit Log เดิม) ผ่าน endpoint ใหม่ worklog/history — ไม่ต้องสร้างระบบ
+     เก็บประวัติแยกใหม่ ของเดิม (auditLog() ใน CREATE/UPDATE/RESCHEDULE/
+     DELETE_WORKLOG) มีครบอยู่แล้ว -->
+<div class="modal-overlay" id="worklog-history-modal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <span class="modal-title">🕘 ประวัติการแก้ไข</span>
+      <button class="modal-close" onclick="closeModal('worklog-history-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="wl-history-body"><div class="empty-state"><div class="spinner"></div>กำลังโหลด...</div></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('worklog-history-modal')">ปิด</button>
+    </div>
+  </div>
+</div>
+
 <script src="assets/js/app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/th.js"></script>
@@ -255,7 +353,18 @@
       document.getElementById('nav-admin').style.display = 'flex';
       const btnWlSum = document.getElementById('btn-wl-summary');
       if (btnWlSum) btnWlSum.style.display = '';
+      const btnWlCat = document.getElementById('btn-wl-categories');
+      if (btnWlCat) btnWlCat.style.display = '';
     }
+  }
+
+  // ── Google Charts (ข้อ 4: Dashboard วิเคราะห์งานภายใน) ──────────────
+  let _wlChartsLoaded = false;
+  try {
+    google.charts.load('current', { packages: ['corechart'] });
+    google.charts.setOnLoadCallback(() => { _wlChartsLoaded = true; drawWorklogCategoryChart(); });
+  } catch (gcErr) {
+    console.warn('[Google Charts] load failed:', gcErr);
   }
 
   // ── Flatpickr (วัน+เวลา) — [Feat 2026-09-23] แทนที่ช่องกรอกวันที่แบบ
@@ -302,11 +411,240 @@
   // [Fix 2026-09-23] ย้ายมาจาก admin.html ทั้งชุด (HTML+JS) เพื่อให้
   // IT_STAFF เข้าถึงได้ผ่านเมนูจริง — ดึงรายชื่อผู้ใช้ผ่าน users/lookup
   // (IT_STAFF+ เรียกได้) แทน API.get('users') เดิมที่เป็น IT_MANAGER เท่านั้น
-  let allWorklog = [];
-  let wlUsers = [];
+  let allWorklog   = [];
+  let wlUsers      = [];
+  let wlCategories = [];  // [Feat 2026-09-24] ข้อ 5: โหลดจาก worklog/categories แทนของตายตัวเดิม
 
   const WL_COLOR_BG = { '🔴':'#fce8e6', '🟡':'#fff3e0', '🟢':'#e6f4ea', '':'#f5f5f5' };
   const WL_COLOR_FG = { '🔴':'#c62828', '🟡':'#e65100', '🟢':'#137333', '':'#999' };
+
+  // [Feat 2026-09-24] ข้อ 4: สีหมวดหมู่ (Dashboard) — ชุดสีที่ผ่านการตรวจสอบ
+  // แล้วด้วย dataviz skill validator (colorblind-safe + contrast) ยึดตาม
+  // "ตำแหน่ง" ของหมวดหมู่ใน wlCategories (รายการหลัก) เสมอ ไม่ใช่ตามลำดับที่
+  // กรอง/แสดงผล ณ ขณะนั้น — ดู references/palette.md ของ dataviz skill
+  const WL_CATEGORY_COLORS = ['#2a78d6','#eb6834','#1baf7a','#eda100','#e87ba4','#008300','#4a3aa7','#e34948'];
+
+  function wlColorForCategory(cat) {
+    const idx = wlCategories.indexOf(cat);
+    return WL_CATEGORY_COLORS[(idx >= 0 ? idx : wlCategories.length) % WL_CATEGORY_COLORS.length];
+  }
+
+  async function loadWorklogCategories() {
+    const res = await API.get('worklog/categories');
+    wlCategories = res.success ? res.data : [];
+    populateWorklogCategorySelects();
+  }
+
+  function populateWorklogCategorySelects() {
+    const filterSel = document.getElementById('wl-filter-category');
+    const editSel   = document.getElementById('wl-category');
+    const curFilter = filterSel.value;
+    const curEdit   = editSel.value;
+    filterSel.innerHTML = '<option value="">ทุกหมวดหมู่</option>' +
+      wlCategories.map(c => `<option>${c}</option>`).join('');
+    editSel.innerHTML = wlCategories.map(c => `<option>${c}</option>`).join('');
+    if (wlCategories.includes(curFilter)) filterSel.value = curFilter;
+    if (wlCategories.includes(curEdit))   editSel.value   = curEdit;
+  }
+
+  // ข้อ 4: จำนวนงานต่อหมวดหมู่ — นับ (ไม่ใช่ชั่วโมงจริง เพราะไม่มีฟิลด์เก็บเวลา)
+  // แสดงตัวเลขกำกับทุกแท่ง (annotation) เสมอ ตามกฎ dataviz: ผลตรวจสี
+  // (validator) เตือนเรื่องคอนทราสต์ของบางสีบนพื้นสว่าง — ต้องมี label
+  // ให้เห็นชัดเจน ไม่พึ่งสีอย่างเดียว
+  function drawWorklogCategoryChart() {
+    if (!_wlChartsLoaded || typeof google === 'undefined' || !google.visualization) return;
+    const el = document.getElementById('worklog-category-chart');
+    if (!el) return;
+    const cats = wlCategories.length ? wlCategories : Array.from(new Set(allWorklog.map(w => w.category).filter(Boolean)));
+    if (!cats.length) { el.innerHTML = '<div class="empty-state fs-12">ยังไม่มีข้อมูล</div>'; document.getElementById('wl-dash-highlight').textContent=''; return; }
+
+    const counts = {};
+    cats.forEach(c => counts[c] = 0);
+    allWorklog.forEach(w => { if (w.category) counts[w.category] = (counts[w.category]||0) + 1; });
+
+    const dt = new google.visualization.DataTable();
+    dt.addColumn('string', 'หมวดหมู่');
+    cats.forEach(c => { dt.addColumn('number', c); dt.addColumn({ type:'number', role:'annotation' }); });
+    const row = ['จำนวนงาน'];
+    cats.forEach(c => { row.push(counts[c]||0); row.push(counts[c]||0); });
+    dt.addRow(row);
+
+    const seriesOpt = {};
+    cats.forEach((c, i) => { seriesOpt[i] = { color: wlColorForCategory(c) }; });
+
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    new google.visualization.ColumnChart(el).draw(dt, {
+      legend: { position: 'bottom', textStyle: { fontSize:11, color: isDark?'#aaa':'#666' } },
+      series: seriesOpt,
+      backgroundColor: 'transparent',
+      hAxis: { textStyle: { fontSize:0 } },
+      vAxis: { minValue:0, gridlines:{color:isDark?'#333':'#f0f0f0'}, textStyle:{fontSize:10,color:isDark?'#aaa':'#666'} },
+      chartArea: { left:36, right:16, top:16, bottom:48 },
+      annotations: { alwaysOutside:false, textStyle:{fontSize:12, color:isDark?'#eee':'#222', bold:true} }
+    });
+
+    let topCat = '', topN = -1;
+    cats.forEach(c => { if ((counts[c]||0) > topN) { topN = counts[c]||0; topCat = c; } });
+    document.getElementById('wl-dash-highlight').textContent = topN > 0
+      ? `หมวดที่มีงานมากที่สุด: ${topCat} (${topN} งาน)` : '';
+  }
+
+  // ── ข้อ 5: จัดการหมวดหมู่ (IT_MANAGER เท่านั้น — ปุ่ม ⚙️ จัดการหมวดหมู่) ──
+  function openCategoryManageModal() {
+    renderCategoryManageList();
+    openModal('worklog-category-modal');
+  }
+
+  function renderCategoryManageList() {
+    const wrap = document.getElementById('wl-category-list');
+    wrap.innerHTML = wlCategories.map(c => `
+      <div class="d-flex justify-between align-center" style="padding:8px 0;border-bottom:1px solid var(--border)">
+        <span class="fs-13">${c}</span>
+        <button class="btn-icon" title="ลบหมวดหมู่นี้" onclick="removeWorklogCategoryUI('${c.replace(/'/g,"\\'")}')">🗑️</button>
+      </div>`).join('') || '<div class="text-muted fs-12">ไม่มีหมวดหมู่</div>';
+  }
+
+  async function addWorklogCategoryUI() {
+    const input = document.getElementById('wl-new-category-name');
+    const name = input.value.trim();
+    if (!name) { showToast('กรุณาระบุชื่อหมวดหมู่','warning'); return; }
+    showLoader('กำลังบันทึก...');
+    try {
+      const res = await API.post('worklog/categories/add', { name });
+      if (res.success) {
+        showToast('เพิ่มหมวดหมู่สำเร็จ','success');
+        input.value = '';
+        wlCategories = res.data;
+        populateWorklogCategorySelects();
+        renderCategoryManageList();
+        drawWorklogCategoryChart();
+      } else showToast(res.data?.error||'เกิดข้อผิดพลาด','error');
+    } catch(e) { showToast('เกิดข้อผิดพลาด','error'); }
+    finally { hideLoader(); }
+  }
+
+  async function removeWorklogCategoryUI(name) {
+    if (!confirm(`ลบหมวดหมู่ "${name}"? งานที่ใช้หมวดหมู่นี้อยู่จะลบไม่ได้จนกว่าจะย้ายงานออกก่อน`)) return;
+    showLoader('กำลังลบ...');
+    try {
+      const res = await API.post('worklog/categories/remove', { name });
+      if (res.success) {
+        showToast('ลบหมวดหมู่สำเร็จ','success');
+        wlCategories = res.data;
+        populateWorklogCategorySelects();
+        renderCategoryManageList();
+        drawWorklogCategoryChart();
+      } else showToast(res.data?.error||'เกิดข้อผิดพลาด','error');
+    } catch(e) { showToast('เกิดข้อผิดพลาด','error'); }
+    finally { hideLoader(); }
+  }
+
+  // ── ข้อ 7d: ดูประวัติการแก้ไขทั้งหมดของแต่ละงาน ──────────────────────
+  async function openWorklogHistoryModal(logId) {
+    openModal('worklog-history-modal');
+    const body = document.getElementById('wl-history-body');
+    body.innerHTML = '<div class="empty-state"><div class="spinner"></div>กำลังโหลด...</div>';
+    const res = await API.get('worklog/history', { id: logId });
+    if (!res.success) { body.innerHTML = `<div class="alert alert-warning">${res.data?.error||'เกิดข้อผิดพลาด'}</div>`; return; }
+    const entries = res.data || [];
+    if (!entries.length) { body.innerHTML = '<div class="empty-state fs-12">ยังไม่มีประวัติ</div>'; return; }
+    body.innerHTML = entries.map(h => `
+      <div style="padding:10px 0;border-bottom:1px solid var(--border)">
+        <div class="d-flex justify-between"><span class="fw-600 fs-13">${AUDIT_TH_WL[h.action]||h.action}</span><span class="text-muted fs-11">${h.timestamp||''}</span></div>
+        <div class="text-muted fs-11">โดย ${h.actor_email||'—'}</div>
+        ${h.new_value ? `<div class="fs-12" style="white-space:pre-line;margin-top:4px">${typeof h.new_value === 'string' ? h.new_value : JSON.stringify(h.new_value)}</div>` : ''}
+      </div>`).join('');
+  }
+
+  const AUDIT_TH_WL = {
+    CREATE_WORKLOG: 'สร้างบันทึกงานภายใน',
+    UPDATE_WORKLOG: 'แก้ไขบันทึกงานภายใน',
+    RESCHEDULE_WORKLOG: 'เลื่อนกำหนดงานภายใน',
+    DELETE_WORKLOG: 'ลบบันทึกงานภายใน',
+    WORKLOG_RESCHEDULE_ALERT: 'แจ้งเตือนเลื่อนกำหนดบ่อย (อัตโนมัติ)',
+    WORKLOG_CATEGORY_UPDATE: 'แก้ไขหมวดหมู่งานภายใน',
+    ATTACH_WORKLOG_FILE: 'แนบไฟล์งานภายใน'
+  };
+
+  // ── ข้อ 2: Chat ส่วนตัว (ผู้รับผิดชอบงาน + IT_MANAGER เท่านั้น) ──────────
+  // [Feat 2026-09-24] ไม่มี real-time push (Apps Script ไม่รองรับ WebSocket) —
+  // ใช้ poll ทุก 8 วิ ตอนเปิดหน้าต่างนี้ค้างไว้แทน หยุด poll ทันทีที่ปิดหน้าต่าง
+  let _wlChatLogId    = null;
+  let _wlChatPollTimer = null;
+
+  function openWorklogChatModal(logId) {
+    const item = allWorklog.find(w => w.log_id === logId);
+    if (!item) return;
+    _wlChatLogId = logId;
+    document.getElementById('wl-chat-title').textContent = item.title;
+    document.getElementById('wl-chat-input').value = '';
+    document.getElementById('wl-chat-messages').innerHTML = '<div class="empty-state fs-12"><div class="spinner"></div>กำลังโหลด...</div>';
+    openModal('worklog-chat-modal');
+    loadWorklogComments();
+    if (_wlChatPollTimer) clearInterval(_wlChatPollTimer);
+    _wlChatPollTimer = setInterval(loadWorklogComments, 8000);
+  }
+
+  function closeWorklogChatModal() {
+    if (_wlChatPollTimer) { clearInterval(_wlChatPollTimer); _wlChatPollTimer = null; }
+    _wlChatLogId = null;
+    closeModal('worklog-chat-modal');
+  }
+
+  async function loadWorklogComments() {
+    if (!_wlChatLogId) return;
+    const res = await API.get('worklog/comments', { id: _wlChatLogId });
+    if (!res.success) return;
+    const box = document.getElementById('wl-chat-messages');
+    const meEmail = getCurrentUser().email;
+    const wasNearBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
+    const comments = res.data || [];
+    box.innerHTML = comments.length ? comments.map(c => {
+      const mine = c.author_email === meEmail;
+      const name = _wlEscapeHtml((wlUsers.find(u=>u.email===c.author_email)||{}).display_name || c.author_email);
+      return `<div style="display:flex;flex-direction:column;align-items:${mine?'flex-end':'flex-start'};margin-bottom:10px">
+        <div class="text-muted fs-11" style="margin-bottom:2px">${name} · ${fmtWLDueDate(c.created_at)}</div>
+        <div style="max-width:80%;padding:8px 12px;border-radius:10px;white-space:pre-line;font-size:13px;
+          background:${mine?'var(--primary)':'var(--surface-alt)'};color:${mine?'#fff':'var(--text-primary)'}">${_wlEscapeHtml(c.message)}</div>
+      </div>`;
+    }).join('') : '<div class="empty-state fs-12" style="padding:20px">ยังไม่มีข้อความ — เริ่มพูดคุยได้เลย</div>';
+    if (wasNearBottom) box.scrollTop = box.scrollHeight;
+  }
+
+  async function sendWorklogComment() {
+    const input = document.getElementById('wl-chat-input');
+    const message = input.value.trim();
+    if (!message || !_wlChatLogId) return;
+    input.value = '';
+    const res = await API.post('worklog/comments/add', { id: _wlChatLogId, message: message });
+    if (res.success) { await loadWorklogComments(); }
+    else showToast(res.data?.error||'ส่งข้อความไม่สำเร็จ','error');
+  }
+
+  // ── ข้อ 7a/7b: Export Excel (CSV) / PDF (พิมพ์หน้าเว็บ) ──────────────
+  // [Feat 2026-09-24] Excel: รูปแบบเดียวกับ exportAuditExcel() ใน admin.html
+  // (CSV + BOM ให้ Excel เปิดแล้วอ่านภาษาไทยถูกต้อง — ไม่ใช้ไลบรารีเพิ่ม)
+  function exportWorklogExcel() {
+    const header = ['เลขที่','ชื่องาน','หมวดหมู่','ผู้รับผิดชอบ','กำหนดส่ง','เลื่อนแล้ว(ครั้ง)','สถานะ','รายละเอียด'];
+    const rows = allWorklog.map(w => [
+      w.log_no||'', w.title||'', w.category||'',
+      (wlUsers.find(u=>u.email===w.assigned_to)||{}).display_name || w.assigned_to || '',
+      fmtWLDueDate(w.due_date), w.reschedule_count||0, w.status||'',
+      String(w.description||'').replace(/"/g,'""').slice(0,300)
+    ]);
+    const csv = '\uFEFF' + [header, ...rows].map(r => r.map(c => '"'+String(c)+'"').join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+    a.download = 'worklog_' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click();
+    showToast('Export สำเร็จ ' + rows.length + ' รายการ','success');
+  }
+
+  // PDF: ใช้ฟังก์ชันพิมพ์ของเบราว์เซอร์เอง ("บันทึกเป็น PDF" ในหน้าต่างพิมพ์)
+  // แทนการเพิ่มไลบรารี — @media print ด้านบนซ่อน sidebar/ปุ่ม/กราฟ เหลือแค่ตาราง
+  function exportWorklogPDF() {
+    window.print();
+  }
 
   function wlStatusColor(item) {
     if (!item.due_date || item.status === '✅ เสร็จแล้ว') return '';
@@ -325,10 +663,11 @@
   }
 
   async function loadWorklog() {
-    await loadWorklogUsers();
+    await Promise.all([loadWorklogUsers(), loadWorklogCategories()]);
     const res = await API.get('worklog/list');
     allWorklog = res.success ? res.data : [];
     renderWorklog();
+    drawWorklogCategoryChart();
   }
 
   function renderWorklog() {
@@ -352,7 +691,7 @@
       return `
       <tr>
         <td class="fs-12 text-muted">${w.log_no||'—'}</td>
-        <td><div class="fw-600 fs-13">${w.title}</div>${w.linked_ticket_id?`<div class="text-muted fs-11">🎫 ${w.linked_ticket_id}</div>`:''}</td>
+        <td><div class="fw-600 fs-13">${w.title}</div>${w.linked_ticket_id?`<div class="text-muted fs-11">🎫 ${w.linked_ticket_id}</div>`:''}${wlAttachmentCount(w)?`<div class="text-muted fs-11">📎 ${wlAttachmentCount(w)} ไฟล์</div>`:''}</td>
         <td class="fs-12">${w.category||'—'}</td>
         <td class="fs-12">${(wlUsers.find(u=>u.email===w.assigned_to)||{}).display_name || w.assigned_to || '—'}</td>
         <td><span class="badge" style="background:${bg};color:${fg}">${color?color+' ':''}${fmtWLDueDate(w.due_date)}</span></td>
@@ -362,11 +701,82 @@
           <div class="d-flex gap-8">
             <button class="btn-icon" title="แก้ไข" onclick="openWorklogModal('${w.log_id}')">✏️</button>
             <button class="btn-icon" title="เลื่อนกำหนด" onclick="openRescheduleModal('${w.log_id}')">🔁</button>
+            <button class="btn-icon" title="พูดคุย" onclick="openWorklogChatModal('${w.log_id}')">💬</button>
+            <button class="btn-icon" title="ประวัติการแก้ไข" onclick="openWorklogHistoryModal('${w.log_id}')">🕘</button>
             ${canDelete ? `<button class="btn-icon" title="ลบ" onclick="deleteWorklogItem('${w.log_id}')">🗑️</button>` : ''}
           </div>
         </td>
       </tr>`;
     }).join('') : '<tr><td colspan="8" class="text-center" style="padding:40px"><div class="empty-state"><div class="empty-icon">📋</div><h3>ยังไม่มีบันทึกงาน</h3></div></td></tr>';
+  }
+
+  // ── ไฟล์แนบ (ข้อ 1 ของ feature request เพิ่มเติม 2026-09-24) ─────────────
+  // ใช้ pattern เดียวกับ tickets.html (FILE_ICONS + thumbnail รูปภาพ) เพื่อความสม่ำเสมอ
+  const WL_IMAGE_EXT  = ['jpg', 'jpeg', 'png', 'gif'];
+  const WL_FILE_ICONS = { pdf:'📄', doc:'📝', docx:'📝', xls:'📊', xlsx:'📊', ppt:'📽️', pptx:'📽️', csv:'📈', txt:'📃', log:'📋' };
+
+  function wlAttachmentUrls(w) {
+    if (!w || !w.attachment_urls) return [];
+    if (Array.isArray(w.attachment_urls)) return w.attachment_urls;
+    try { return JSON.parse(w.attachment_urls) || []; } catch (e) { return []; }
+  }
+
+  function wlAttachmentCount(w) { return wlAttachmentUrls(w).length; }
+
+  function _wlDriveThumbUrl(url) {
+    const m = url.match(/[?&]id=([^&]+)/);
+    return m ? 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w200' : url;
+  }
+
+  function _wlEscapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function renderWlAttachmentList(item) {
+    const wrap = document.getElementById('wl-attachment-list');
+    const urls = item ? wlAttachmentUrls(item) : [];
+    wrap.innerHTML = urls.map(a => {
+      const label = _wlEscapeHtml(a.name || 'ไฟล์แนบ');
+      const ext   = (a.name||'').toLowerCase().split('.').pop();
+      const inner = WL_IMAGE_EXT.indexOf(ext) !== -1
+        ? `<img src="${_wlDriveThumbUrl(a.url)}" style="width:56px;height:56px;object-fit:cover;border-radius:6px" onerror="this.replaceWith(Object.assign(document.createElement('div'),{textContent:'📎',style:'font-size:28px'}))">`
+        : `<div style="font-size:28px">${WL_FILE_ICONS[ext]||'📎'}</div>`;
+      return `<a href="${a.url}" target="_blank" title="${label} — กดเพื่อเปิด"
+        style="display:flex;flex-direction:column;align-items:center;width:64px;text-decoration:none;color:var(--text-primary)">
+        <div style="width:56px;height:56px;display:flex;align-items:center;justify-content:center;background:var(--surface-alt);border-radius:6px;overflow:hidden">${inner}</div>
+        <div class="fs-11" style="max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px" title="${label}">${label}</div>
+      </a>`;
+    }).join('');
+  }
+
+  function _wlFileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('อ่านไฟล์ไม่ได้'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // อัปโหลดไฟล์ที่เลือกไว้ (ถ้ามี) ให้กับงานที่เพิ่ง create/update สำเร็จแล้ว —
+  // เรียกหลังจากมี log_id แน่นอนแล้วเท่านั้น (ตอนสร้างใหม่ต้อง create ก่อนแนบได้)
+  async function _wlUploadSelectedAttachments(logId) {
+    const input = document.getElementById('wl-attachment-input');
+    const files = input && input.files ? Array.from(input.files) : [];
+    if (!files.length) return;
+    for (const file of files) {
+      try {
+        const dataUrl  = await _wlFileToBase64(file);
+        const fileData = dataUrl.split(',')[1];
+        const res = await API.post('worklog/attach', {
+          id: logId, file_name: file.name, mime_type: file.type || 'application/octet-stream', file_data: fileData
+        });
+        if (!res.success) showToast((res.data?.error||'แนบไฟล์ไม่สำเร็จ') + ': ' + file.name, 'error');
+      } catch (e) {
+        showToast('แนบไฟล์ไม่สำเร็จ: ' + file.name, 'error');
+      }
+    }
+    input.value = '';
   }
 
   function _wlPopulateAssigneeOptions(selectedEmail) {
@@ -384,7 +794,7 @@
     document.getElementById('wl-log-id').value = item ? item.log_id : '';
     document.getElementById('worklog-modal-title').textContent = item ? '✏️ แก้ไขบันทึกงานภายใน' : '📋 เพิ่มบันทึกงานภายใน';
     document.getElementById('wl-title').value = item ? item.title : '';
-    document.getElementById('wl-category').value = item ? item.category : '🔧 แก้ไขระบบ';
+    document.getElementById('wl-category').value = item ? item.category : (wlCategories[0] || '');
     document.getElementById('wl-description').value = item ? (item.description||'') : '';
     document.getElementById('wl-linked-ticket').value = item ? (item.linked_ticket_id||'') : '';
     _wlPopulateAssigneeOptions(item ? item.assigned_to : null);
@@ -396,6 +806,9 @@
 
     document.getElementById('wl-status-group').style.display = item ? '' : 'none';
     if (item) document.getElementById('wl-status').value = item.status;
+
+    document.getElementById('wl-attachment-input').value = '';
+    renderWlAttachmentList(item);
 
     openModal('worklog-modal');
   }
@@ -430,7 +843,11 @@
           linked_ticket_id: document.getElementById('wl-linked-ticket').value
         });
       }
-      if (res.success) { showToast('บันทึกสำเร็จ','success'); closeModal('worklog-modal'); await loadWorklog(); }
+      if (res.success) {
+        const savedLogId = res.data.log_id || logId;
+        await _wlUploadSelectedAttachments(savedLogId);
+        showToast('บันทึกสำเร็จ','success'); closeModal('worklog-modal'); await loadWorklog();
+      }
       else showToast(res.data?.error||'เกิดข้อผิดพลาด','error');
     } catch(e) { showToast('เกิดข้อผิดพลาด','error'); }
     finally { hideLoader(); }

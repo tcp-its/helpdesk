@@ -228,6 +228,9 @@
               <option value="UPDATE_WORKLOG">แก้ไขบันทึกงานภายใน</option>
               <option value="RESCHEDULE_WORKLOG">เลื่อนกำหนดงานภายใน</option>
               <option value="DELETE_WORKLOG">ลบบันทึกงานภายใน</option>
+              <option value="WORKLOG_CATEGORY_UPDATE">แก้ไขหมวดหมู่งานภายใน</option>
+              <option value="WORKLOG_RESCHEDULE_ALERT">แจ้งเตือนเลื่อนกำหนดบ่อย (อัตโนมัติ)</option>
+              <option value="ATTACH_WORKLOG_FILE">แนบไฟล์งานภายใน</option>
             </select>
           </div>
         </div>
@@ -795,13 +798,18 @@
     // ให้เลยโชว์เป็นรหัส action ดิบๆ และกรองแยกไม่ได้ (ดู Known Issues Log)
     CREATE_WORKLOG:'สร้างบันทึกงานภายใน', UPDATE_WORKLOG:'แก้ไขบันทึกงานภายใน',
     RESCHEDULE_WORKLOG:'เลื่อนกำหนดงานภายใน', DELETE_WORKLOG:'ลบบันทึกงานภายใน',
-    WORKLOG_WEEKLY_SUMMARY:'สรุปงานภายในรายสัปดาห์ (AI)'
+    WORKLOG_WEEKLY_SUMMARY:'สรุปงานภายในรายสัปดาห์ (AI)',
+    // [Feat 2026-09-24] ข้อ 5/7c ของ backlog
+    WORKLOG_CATEGORY_UPDATE:'แก้ไขหมวดหมู่งานภายใน',
+    WORKLOG_RESCHEDULE_ALERT:'แจ้งเตือนเลื่อนกำหนดบ่อย (อัตโนมัติ)',
+    ATTACH_WORKLOG_FILE:'แนบไฟล์งานภายใน'
   };
   const AUDIT_ICON = {
     CREATE_TICKET:'🎫', UPDATE_STATUS:'🔄', CLOSE_TICKET:'✅', ASSIGN_TICKET:'👤',
     ADD_RESOLUTION:'💡', UPDATE_ROLE:'🔑', SLA_BREACH:'🚨', KB_APPROVED:'📚',
     CREATE_WORKLOG:'📋', UPDATE_WORKLOG:'✏️', RESCHEDULE_WORKLOG:'🔁', DELETE_WORKLOG:'🗑️',
-    WORKLOG_WEEKLY_SUMMARY:'🤖',
+    WORKLOG_WEEKLY_SUMMARY:'🤖', WORKLOG_CATEGORY_UPDATE:'🏷️', WORKLOG_RESCHEDULE_ALERT:'📧',
+    ATTACH_WORKLOG_FILE:'📎',
     CONFIG_UPDATE:'⚙️', CREATE_USER:'👥', USER_LOGIN:'🔐', FAQ_CREATED:'❓'
   };
 
