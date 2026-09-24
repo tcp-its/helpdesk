@@ -54,6 +54,7 @@
       <a href="tickets.html"   class="nav-item"><span class="nav-icon">🎫</span><span class="nav-label">Ticket ทั้งหมด</span><span class="nav-badge" id="nav-open-count">0</span></a>
       <a href="tickets.html?new=1" class="nav-item"><span class="nav-icon">➕</span><span class="nav-label">เปิด Ticket ใหม่</span></a>
       <div class="nav-section" id="nav-it-section" style="display:none">IT TEAM</div>
+      <a href="worklog.html"   class="nav-item" id="nav-worklog"  style="display:none"><span class="nav-icon">📋</span><span class="nav-label">บันทึกงานภายใน</span></a>
       <a href="analytics.html" class="nav-item" id="nav-analytics" style="display:none"><span class="nav-icon">📈</span><span class="nav-label">Analytics</span></a>
       <a href="admin.html"     class="nav-item" id="nav-admin"     style="display:none"><span class="nav-icon">⚙️</span><span class="nav-label">Admin</span></a>
     </div>
@@ -242,6 +243,7 @@
     }
     if (isITStaff()) {
       document.getElementById('nav-it-section').style.display  = 'block';
+      document.getElementById('nav-worklog').style.display     = 'flex';
       document.getElementById('nav-analytics').style.display   = 'flex';
     }
     if (isManager()) {

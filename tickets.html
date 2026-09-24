@@ -45,6 +45,7 @@
       <a href="tickets.html"   class="nav-item active"><span class="nav-icon">🎫</span><span class="nav-label">Ticket ทั้งหมด</span></a>
       <a href="tickets.html?new=1" class="nav-item"><span class="nav-icon">➕</span><span class="nav-label">เปิด Ticket ใหม่</span></a>
       <div class="nav-section" id="nav-it-section" style="display:none">IT TEAM</div>
+      <a href="worklog.html"   class="nav-item" id="nav-worklog"  style="display:none"><span class="nav-icon">📋</span><span class="nav-label">บันทึกงานภายใน</span></a>
       <a href="analytics.html" class="nav-item" id="nav-analytics" style="display:none"><span class="nav-icon">📈</span><span class="nav-label">Analytics</span></a>
       <a href="admin.html"     class="nav-item" id="nav-admin"     style="display:none"><span class="nav-icon">⚙️</span><span class="nav-label">Admin</span></a>
     </div>
@@ -459,41 +460,8 @@
               ⏳ กำลังอัปโหลด...
             </div>
           </div>
-
-          <!-- [Feat 2026-09-19] ลบ Ticket (soft delete) — IT_MANAGER เท่านั้น -->
-          <div id="delete-ticket-section" style="display:none;margin-top:16px">
-            <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">
-            <div style="padding:12px;background:#fce8e6;border:1px solid #f5b7b1;border-radius:8px">
-              <div class="form-label" style="color:#c62828">🗑️ ลบ Ticket (IT_MANAGER)</div>
-              <div class="text-muted fs-11 mb-8">Soft delete — Ticket จะหายจากทุกรายการและรายงาน แต่ยังตรวจสอบย้อนหลังได้ใน Google Sheet โดยตรง ต้องระบุเหตุผล และไม่สามารถกู้คืนได้จากหน้าเว็บ</div>
-              <button class="btn btn-danger btn-block" onclick="openDeleteTicketDialog()">🗑️ ลบ Ticket นี้</button>
-            </div>
-          </div>
         </div>
       </div>
-    </div>
-  </div>
-</div>
-
-<!-- ── Delete Ticket Confirm Modal (IT_MANAGER) ─────────────── -->
-<div class="modal-overlay" id="delete-ticket-modal">
-  <div class="modal" style="max-width:440px">
-    <div class="modal-header">
-      <span class="modal-title" style="color:#c62828">🗑️ ยืนยันการลบ Ticket</span>
-      <button class="modal-close" onclick="closeModal('delete-ticket-modal')">×</button>
-    </div>
-    <div class="modal-body">
-      <p style="font-size:14px;color:var(--text-secondary);margin-bottom:12px">
-        คุณกำลังจะลบ Ticket <strong id="delete-modal-ticket-id"></strong> — การลบนี้จะซ่อน Ticket ออกจากทุกรายการและรายงาน และ<strong>ไม่สามารถกู้คืนได้จากหน้าเว็บ</strong> (กู้คืนได้เฉพาะแก้ไขตรงใน Google Sheet เท่านั้น)
-      </p>
-      <div class="form-group">
-        <label class="form-label">เหตุผลที่ลบ <span style="color:var(--danger)">*</span></label>
-        <textarea class="form-control" id="delete-comment-input" rows="3" placeholder="เช่น แจ้งซ้ำ, Ticket ทดสอบระบบ ฯลฯ (จำเป็นต้องระบุ)"></textarea>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('delete-ticket-modal')">ยกเลิก</button>
-      <button class="btn btn-danger" onclick="confirmDeleteTicket()">🗑️ ยืนยันลบ</button>
     </div>
   </div>
 </div>
@@ -537,9 +505,6 @@
   let allTickets = [];
   let currentTicket = null;
   let selectedScore = 0;
-  // [Feat 2026-09-19] true when landed via Dashboard's "รอ Assign" KPI card
-  // (?assignee=unassigned) — restricts the list to tickets with no assignee yet.
-  let filterUnassignedOnly = false;
 
   // [Feat] ประเภท Ticket + KPI Mapping — mirrors backend Config.js so the
   // inline "ประเภท" editor can show/save without a round-trip, and the
@@ -567,30 +532,18 @@
     document.getElementById('user-avatar').textContent = (user.display_name||'U')[0];
     if (isITStaff()) {
       document.getElementById('nav-it-section').style.display = 'block';
+      document.getElementById('nav-worklog').style.display = 'flex';
       document.getElementById('nav-analytics').style.display = 'flex';
     }
     if (isManager()) document.getElementById('nav-admin').style.display = 'flex';
   }
 
   // Auto-open modal if ?new=1 or ?id=xxx
-  // [Feat 2026-09-19] ?status=... หรือ ?q=... — รองรับคลิกจาก KPI card ใน
-  // Dashboard เพื่อกรองรายการมาให้ตรงเงื่อนไขทันที (ไม่กระทบพฤติกรรมเดิม
-  // เมื่อไม่มี param เหล่านี้)
   window.addEventListener('load', async () => {
     await loadTickets();
     if (isITStaff()) await loadUsersLookup();
     if (urlParams.get('new')) openNewTicketModal();
     if (urlParams.get('id')) openTicketDetail(urlParams.get('id'));
-    if (urlParams.get('status')) setStatusTab(urlParams.get('status'));
-    if (urlParams.get('q')) {
-      document.getElementById('search-input').value = urlParams.get('q');
-      applyFilters();
-    }
-    if (urlParams.get('assignee') === 'unassigned') {
-      filterUnassignedOnly = true;
-      applyFilters();
-      showToast('กำลังกรองเฉพาะ Ticket ที่รอ Assign', 'info');
-    }
   });
 
   // ── Requester Lookup ("open ticket on behalf of") ────────────
@@ -635,12 +588,12 @@
       const slaText  = t.sla_deadline ? `<span style="color:${new Date(t.sla_deadline)<new Date()?'var(--danger)':'var(--text-secondary)'};font-size:11px">${formatDate(t.sla_deadline)}</span>` : '<span class="text-muted">—</span>';
       return `<tr class="${rowClass}" onclick="openTicketDetail('${t.ticket_id}')">
         <td><span style="font-weight:700;color:var(--primary);font-size:12px">${t.ticket_id}</span></td>
-        <td style="max-width:200px;white-space:nowrap;overflow-x:auto;overflow-y:hidden" title="${(t.title||'').replace(/"/g,'&quot;')}">${t.title||'—'}</td>
+        <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.title||'—'}</td>
         <td class="fs-12">${t.requester_name||'—'}</td>
         <td class="fs-12">${t.ticket_type||'—'}</td>
         <td>${statusBadge(t.status)}</td>
         <td>${priorityBadge(t.priority)}</td>
-        <td class="fs-12">${t.assigned_name||'<span class="text-muted">รอ Assign</span>'}</td>
+        <td class="fs-12">${t.assigned_name||'<span class="text-muted">—</span>'}</td>
         <td>${slaText}</td>
         <td class="fs-12 text-muted">${timeAgo(t.created_at)}</td>
         <td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openTicketDetail('${t.ticket_id}')">รายละเอียด</button></td>
@@ -698,7 +651,6 @@
     const df   = parseDDMMYYYY(document.getElementById('filter-date-from').value);
     const dt   = parseDDMMYYYY(document.getElementById('filter-date-to').value);
     let result = allTickets.filter(t => {
-      if (filterUnassignedOnly && t.assigned_to) return false;
       if (kw && !JSON.stringify(t).toLowerCase().includes(kw)) return false;
       if (st && t.status !== st) return false;
       if (pr && t.priority !== pr) return false;
@@ -724,7 +676,6 @@
   }
 
   function clearFilters() {
-    filterUnassignedOnly = false;
     ['search-input','filter-status','filter-priority','filter-type','filter-date-from','filter-date-to']
       .forEach(id => document.getElementById(id).value = '');
     updateFilterBadge();
@@ -878,7 +829,7 @@
       <div class="detail-meta-item"><div class="detail-meta-label">ผู้แจ้ง</div><div class="detail-meta-value">${t.requester_name}</div></div>
       <div class="detail-meta-item"><div class="detail-meta-label">สร้างเมื่อ</div><div class="detail-meta-value">${formatDate(t.created_at)}</div></div>
       ${t.sla_deadline ? `<div class="detail-meta-item"><div class="detail-meta-label">SLA Deadline</div><div class="detail-meta-value" style="color:${new Date(t.sla_deadline)<new Date()?'var(--danger)':'var(--warning)'}">${formatDate(t.sla_deadline)}</div></div>` : ''}
-      <div class="detail-meta-item"><div class="detail-meta-label">ผู้รับผิดชอบ</div><div class="detail-meta-value">${t.assigned_name || 'รอ Assign'}</div></div>
+      ${t.assigned_name ? `<div class="detail-meta-item"><div class="detail-meta-label">ผู้รับผิดชอบ</div><div class="detail-meta-value">${t.assigned_name}</div></div>` : ''}
     `;
 
     // Description
@@ -1013,14 +964,11 @@
         slaMgrSection.style.display = 'none';
       }
 
-      // [Feat 2026-09-19] ลบ Ticket — IT_MANAGER เท่านั้น
-      document.getElementById('delete-ticket-section').style.display = isManager() ? 'block' : 'none';
-
       const statusSel = document.getElementById('detail-status-select');
       statusSel.value = t.status;
 
       const assignSel = document.getElementById('detail-assign-select');
-      assignSel.innerHTML = '<option value="">รอ Assign</option>' +
+      assignSel.innerHTML = '<option value="">— เลือก IT Staff —</option>' +
         staff.filter(s => s.role !== 'IT_MANAGER' || isManager()).map(s =>
           `<option value="${s.email}" ${s.email===t.assigned_to?'selected':''}>${s.display_name}</option>`
         ).join('');
@@ -1393,37 +1341,6 @@
     const res = await API.post('ticket/reopen', { ticket_id: currentTicket.ticket_id });
     if (res.success) { showToast('เปิด Ticket ใหม่แล้ว', 'success'); await loadTickets(); closeModal('ticket-detail-modal'); }
     else showToast(res.data?.error || 'เกิดข้อผิดพลาด', 'error');
-  }
-
-  // ── Delete Ticket (soft delete, IT_MANAGER only) ─────────────
-  function openDeleteTicketDialog() {
-    if (!currentTicket) return;
-    document.getElementById('delete-modal-ticket-id').textContent = currentTicket.ticket_id;
-    document.getElementById('delete-comment-input').value = '';
-    openModal('delete-ticket-modal');
-  }
-
-  async function confirmDeleteTicket() {
-    const comment = document.getElementById('delete-comment-input').value.trim();
-    if (!comment) { showToast('กรุณาระบุเหตุผลที่ลบ', 'warning'); return; }
-    if (!currentTicket) return;
-    showLoader('กำลังลบ Ticket...');
-    try {
-      const res = await API.post('ticket/delete', { ticket_id: currentTicket.ticket_id, comment });
-      if (res.success) {
-        showToast('ลบ Ticket แล้ว', 'success');
-        closeModal('delete-ticket-modal');
-        closeModal('ticket-detail-modal');
-        await loadTickets();
-      } else {
-        showToast('ลบไม่สำเร็จ: ' + (res.data?.error || 'กรุณาลองใหม่'), 'error');
-      }
-    } catch (e) {
-      showToast('เกิดข้อผิดพลาด', 'error');
-      console.error('confirmDeleteTicket error:', e);
-    } finally {
-      hideLoader();
-    }
   }
 
   // ── Resend Survey (IT Staff) ─────────────────────────────────
