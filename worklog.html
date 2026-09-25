@@ -13,12 +13,39 @@
     /* ── หมวดหมู่งานภายใน (Print view สำหรับ Export PDF) — [Feat 2026-09-24] ──
        ซ่อนทุกอย่างยกเว้นตาราง WorkLog ตอนสั่งพิมพ์/บันทึกเป็น PDF ─────── */
     @media print {
-      .sidebar, .app-header, .header-actions, #wl-actions-row, #worklog-dashboard-card,
+      .sidebar, .app-header, .header-actions, #wl-actions-row, #wl-tabs, .wl-dash-filter-row,
       .modal-overlay, #wl-print-hide { display:none !important; }
       .main-content { margin:0 !important; }
       .page-content { padding:0 !important; }
       table th:last-child, table td:last-child { display:none; }
+      /* [Feat 2026-09-24] ข้อ 1/5 (backlog รอบ 2): พิมพ์เฉพาะแท็บที่กำลังเปิดอยู่
+         ปกติ (list tab) ซ่อน Dashboard เสมอ — exportWorklogDashboardPDF() จะสลับ
+         มาโหมด body.wl-printing-dashboard ก่อนเรียก window.print() แทน */
+      #wl-tab-dashboard { display:none !important; }
+      #wl-tab-list       { display:block !important; }
+      body.wl-printing-dashboard #wl-tab-dashboard { display:block !important; }
+      body.wl-printing-dashboard #wl-tab-list       { display:none !important; }
     }
+    /* ── ข้อ 1 (backlog รอบ 2): แท็บ รายการงาน / Dashboard ──────────────── */
+    .wl-tabs { display:flex; gap:0; border-bottom:2px solid var(--border); margin-bottom:16px; overflow-x:auto; }
+    .wl-tab  { padding:10px 20px; cursor:pointer; font-size:13px; font-weight:600; color:var(--text-secondary);
+      border-bottom:2px solid transparent; white-space:nowrap; }
+    .wl-tab.active { color:var(--primary); border-bottom-color:var(--primary); }
+    .wl-tab:hover  { color:var(--primary); }
+
+    /* ── ข้อ 6 (backlog รอบ 2): พับ/กางรายการเดือนเก่า ────────────────── */
+    .wl-month-row td { background:var(--surface-alt); font-weight:700; font-size:12px; cursor:pointer; padding:9px 14px !important; }
+    .wl-month-caret { display:inline-block; transition:transform .15s; margin-right:6px; }
+    .wl-month-row.collapsed .wl-month-caret { transform:rotate(-90deg); }
+    .wl-month-item-hidden { display:none !important; }
+
+    /* ── ข้อ 2/7 (backlog รอบ 2): ช่วงเวลา + การ์ดสถิติ ใน Dashboard ──── */
+    .wl-period-btn { padding:6px 14px; font-size:12px; border-radius:6px; border:1px solid var(--border);
+      background:var(--surface); color:var(--text-secondary); cursor:pointer; }
+    .wl-period-btn.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+    .wl-stat-card { flex:1; min-width:150px; background:var(--surface-alt); border-radius:8px; padding:12px 14px; }
+    .wl-stat-card .wl-stat-value { font-size:22px; font-weight:800; line-height:1.2; }
+    .wl-stat-card .wl-stat-label { font-size:11px; color:var(--text-muted); margin-top:2px; }
     /* ── Flatpickr Overrides (คัดลอกจาก analytics.html เพื่อความสม่ำเสมอ) ── */
     .flatpickr-input { cursor:pointer; }
     .flatpickr-months .flatpickr-month,
@@ -97,49 +124,93 @@
       <!-- [Feat 2026-09-22] แยกจาก Tickets โดยสิ้นเชิง — ไม่นับรวมสถิติ Ticket/SLA/Kaizen ใดๆ -->
       <!-- [Fix 2026-09-23] ย้ายออกมาจาก admin.html (เดิมซ่อนอยู่หลัง Admin ที่ IT_STAFF มองไม่เห็น) -->
       <div id="section-worklog">
-        <div class="d-flex justify-between align-center mb-16" style="flex-wrap:wrap;gap:10px">
-          <h3 class="fs-16">📋 บันทึกงานภายใน (Internal Work Log)</h3>
-          <div class="d-flex gap-8" id="wl-actions-row" style="flex-wrap:wrap;align-items:center">
-            <select class="form-control" id="wl-filter-category" style="width:170px" onchange="renderWorklog()">
-              <option value="">ทุกหมวดหมู่</option>
-            </select>
-            <select class="form-control" id="wl-filter-status" style="width:140px" onchange="renderWorklog()">
-              <option value="">ทุกสถานะ</option>
-              <option>📝 To Do</option>
-              <option>🔄 กำลังทำ</option>
-              <option>✅ เสร็จแล้ว</option>
-            </select>
-            <button class="btn btn-secondary btn-sm" onclick="exportWorklogExcel()">📥 Excel</button>
-            <button class="btn btn-secondary btn-sm" onclick="exportWorklogPDF()">🖨️ PDF</button>
-            <button class="btn btn-secondary btn-sm" id="btn-wl-categories" style="display:none" onclick="openCategoryManageModal()">⚙️ จัดการหมวดหมู่</button>
-            <button class="btn btn-secondary btn-sm" id="btn-wl-summary" style="display:none" onclick="generateWeeklySummary()">🤖 สรุปสัปดาห์ (AI)</button>
-            <button class="btn btn-primary btn-sm" onclick="openWorklogModal()">➕ เพิ่มงาน</button>
+        <h3 class="fs-16 mb-8">📋 บันทึกงานภายใน (Internal Work Log)</h3>
+
+        <!-- ── ข้อ 1 (backlog รอบ 2): แยกเป็น 2 แท็บ — เดิมตาราง+Dashboard
+             เรียงต่อกันยาวหน้าเดียว ทำให้ scroll เยอะและปนกันดูยาก ── -->
+        <div class="wl-tabs" id="wl-tabs">
+          <div class="wl-tab active" id="wl-tab-btn-list"      onclick="switchWlTab('list')">📋 รายการงาน</div>
+          <div class="wl-tab"        id="wl-tab-btn-dashboard" onclick="switchWlTab('dashboard')">📊 Dashboard</div>
+        </div>
+
+        <!-- ══════════════════════ แท็บ: รายการงาน ══════════════════════ -->
+        <div id="wl-tab-list">
+          <div class="d-flex justify-between align-center mb-16" style="flex-wrap:wrap;gap:10px">
+            <div class="d-flex gap-8" id="wl-actions-row" style="flex-wrap:wrap;align-items:center">
+              <select class="form-control" id="wl-filter-category" style="width:170px" onchange="renderWorklog()">
+                <option value="">ทุกหมวดหมู่</option>
+              </select>
+              <select class="form-control" id="wl-filter-status" style="width:140px" onchange="renderWorklog()">
+                <option value="">ทุกสถานะ</option>
+                <option>📝 To Do</option>
+                <option>🔄 กำลังทำ</option>
+                <option>✅ เสร็จแล้ว</option>
+              </select>
+              <button class="btn btn-secondary btn-sm" onclick="exportWorklogExcel()">📥 Excel</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportWorklogPDF()">🖨️ PDF</button>
+              <button class="btn btn-secondary btn-sm" id="btn-wl-categories" style="display:none" onclick="openCategoryManageModal()">⚙️ จัดการหมวดหมู่</button>
+              <button class="btn btn-secondary btn-sm" id="btn-wl-summary" style="display:none" onclick="generateWeeklySummary()">🤖 สรุปสัปดาห์ (AI)</button>
+              <button class="btn btn-primary btn-sm" onclick="openWorklogModal()">➕ เพิ่มงาน</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr><th>เลขที่</th><th>ชื่องาน</th><th>หมวดหมู่</th><th>ผู้รับผิดชอบ</th><th>กำหนดส่ง</th><th>เลื่อนแล้ว</th><th>สถานะ</th><th>การดำเนินการ</th></tr>
+                </thead>
+                <tbody id="worklog-tbody">
+                  <tr><td colspan="8" class="text-center" style="padding:40px"><div class="spinner" style="margin:0 auto 16px"></div>กำลังโหลด...</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        <!-- ── ข้อ 4: Dashboard วิเคราะห์งานภายในแยกตามหมวดหมู่ ─────────────
-             [Feat 2026-09-24] นับจำนวนงานต่อหมวดหมู่ (ไม่ใช่ชั่วโมงจริง —
-             ไม่มีฟิลด์บันทึกเวลาทำงาน) สีแต่ละหมวดยึดตามตำแหน่งใน "รายการ
-             หมวดหมู่หลัก" เสมอ (ไม่ใช่ตามลำดับที่กรองเห็น) เพื่อไม่ให้สี
-             ของหมวดเดิมเปลี่ยนไปมาเวลากรอง — ดู dataviz skill: "color follows
-             the entity, never its rank" ── -->
-        <div class="card mb-16" id="worklog-dashboard-card">
-          <div class="d-flex justify-between align-center mb-8" style="flex-wrap:wrap;gap:8px">
-            <h3 class="fs-14">📊 วิเคราะห์งานภายใน — จำนวนงานต่อหมวดหมู่</h3>
-            <span class="text-muted fs-12" id="wl-dash-highlight"></span>
+        <!-- ══════════════════════ แท็บ: Dashboard ══════════════════════ -->
+        <!-- [Feat 2026-09-24] ข้อ 2/5/7 (backlog รอบ 2): เพิ่มตัวกรองช่วงเวลา,
+             Timeline งานพร้อมกันต่อคน, กราฟภาระงานต่อคน, ระยะเวลาเฉลี่ยต่อ
+             หมวดหมู่, การ์ดสถิติ และปุ่ม PDF เฉพาะแท็บนี้ — กราฟหมวดหมู่เดิม
+             (ข้อ 4 รอบก่อน) ยังอยู่ครบ ย้ายมาไว้ในแท็บนี้เท่านั้น -->
+        <div id="wl-tab-dashboard" style="display:none">
+          <div class="card mb-16 wl-dash-filter-row">
+            <div class="d-flex justify-between align-center" style="flex-wrap:wrap;gap:10px">
+              <div class="d-flex gap-8" style="flex-wrap:wrap;align-items:center">
+                <span class="fs-12 text-muted">ช่วงเวลา:</span>
+                <button class="wl-period-btn" id="wl-period-btn-today" onclick="setWlPeriod('today')">วันนี้</button>
+                <button class="wl-period-btn active" id="wl-period-btn-week" onclick="setWlPeriod('week')">สัปดาห์นี้</button>
+                <button class="wl-period-btn" id="wl-period-btn-month" onclick="setWlPeriod('month')">เดือนนี้</button>
+                <button class="wl-period-btn" id="wl-period-btn-custom" onclick="setWlPeriod('custom')">กำหนดเอง</button>
+                <input type="text" class="form-control" id="wl-period-custom-range" style="width:220px;display:none" placeholder="เลือกช่วงวันที่">
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="exportWorklogDashboardPDF()">🖨️ PDF Dashboard</button>
+            </div>
           </div>
-          <div id="worklog-category-chart" style="width:100%;height:260px"></div>
-        </div>
-        <div class="card">
-          <div class="table-wrapper">
-            <table>
-              <thead>
-                <tr><th>เลขที่</th><th>ชื่องาน</th><th>หมวดหมู่</th><th>ผู้รับผิดชอบ</th><th>กำหนดส่ง</th><th>เลื่อนแล้ว</th><th>สถานะ</th><th>การดำเนินการ</th></tr>
-              </thead>
-              <tbody id="worklog-tbody">
-                <tr><td colspan="8" class="text-center" style="padding:40px"><div class="spinner" style="margin:0 auto 16px"></div>กำลังโหลด...</td></tr>
-              </tbody>
-            </table>
+
+          <div class="d-flex gap-12 mb-16" style="flex-wrap:wrap" id="wl-stat-cards"></div>
+
+          <div class="card mb-16" id="worklog-dashboard-card">
+            <div class="d-flex justify-between align-center mb-8" style="flex-wrap:wrap;gap:8px">
+              <h3 class="fs-14">📊 จำนวนงานต่อหมวดหมู่ (ทั้งหมด — ไม่กรองตามช่วงเวลา)</h3>
+              <span class="text-muted fs-12" id="wl-dash-highlight"></span>
+            </div>
+            <div id="worklog-category-chart" style="width:100%;height:260px"></div>
+          </div>
+
+          <div class="card mb-16">
+            <h3 class="fs-14 mb-8">👥 ภาระงานต่อคน (ในช่วงเวลาที่เลือก)</h3>
+            <div id="worklog-staff-chart" style="width:100%;height:260px"></div>
+          </div>
+
+          <div class="card mb-16">
+            <h3 class="fs-14 mb-8">⏱️ ระยะเวลาทำงานเฉลี่ยต่อหมวดหมู่ (ชั่วโมง — เฉพาะงานที่เสร็จแล้วในช่วงเวลาที่เลือก)</h3>
+            <div id="worklog-duration-chart" style="width:100%;height:260px"></div>
+          </div>
+
+          <div class="card">
+            <h3 class="fs-14 mb-8">📅 Timeline งานที่ทำพร้อมกันต่อคน (ในช่วงเวลาที่เลือก)</h3>
+            <div class="text-muted fs-11 mb-8">แท่งแสดงช่วงเวลา "เวลาเริ่มงาน" ถึง "เสร็จ/กำหนดส่ง" ของแต่ละงาน — แท่งที่ซ้อนทับกันในแถวเดียวกัน คืองานที่ทำพร้อมกันของคนคนนั้น</div>
+            <div id="worklog-timeline-chart" style="width:100%"></div>
           </div>
         </div>
       </div>
@@ -181,6 +252,18 @@
       <div class="form-group">
         <label class="form-label">ผู้รับผิดชอบ <span class="required">*</span></label>
         <select class="form-control" id="wl-assigned-to"></select>
+      </div>
+      <!-- [Feat 2026-09-24] ข้อ 3 (backlog รอบ 2): "เวลาเริ่มงาน" = created_at
+           เดิม — แก้ไขได้เฉพาะ IT_MANAGER (พนักงานเห็นได้อย่างเดียว) ใช้คำนวณ
+           ระยะเวลาทำงานจริงใน Dashboard (Timeline + ระยะเวลาเฉลี่ยต่อหมวดหมู่) -->
+      <div class="form-group" id="wl-created-at-group" style="display:none">
+        <label class="form-label">เวลาเริ่มงาน</label>
+        <input type="text" class="form-control" id="wl-created-at" placeholder="เลือกวันและเวลา">
+        <div class="text-muted fs-11 mt-8">แก้ไขได้เฉพาะหัวหน้าแผนก (IT_MANAGER) — ใช้คำนวณระยะเวลาทำงานจริงใน Dashboard</div>
+      </div>
+      <div class="form-group" id="wl-created-at-readonly-group" style="display:none">
+        <label class="form-label">เวลาเริ่มงาน</label>
+        <div class="fs-13" id="wl-created-at-readonly">—</div>
       </div>
       <div class="form-group" id="wl-due-date-group">
         <label class="form-label">กำหนดส่ง <span class="required">*</span></label>
@@ -358,18 +441,19 @@
     }
   }
 
-  // ── Google Charts (ข้อ 4: Dashboard วิเคราะห์งานภายใน) ──────────────
+  // ── Google Charts (ข้อ 4 เดิม + ข้อ 2/7 backlog รอบ 2: Dashboard วิเคราะห์
+  // งานภายใน) — เพิ่ม package 'timeline' สำหรับ Timeline งานพร้อมกันต่อคน ──
   let _wlChartsLoaded = false;
   try {
-    google.charts.load('current', { packages: ['corechart'] });
-    google.charts.setOnLoadCallback(() => { _wlChartsLoaded = true; drawWorklogCategoryChart(); });
+    google.charts.load('current', { packages: ['corechart', 'timeline'] });
+    google.charts.setOnLoadCallback(() => { _wlChartsLoaded = true; drawWorklogCategoryChart(); if (_wlDashboardTabActive) refreshWlDashboard(); });
   } catch (gcErr) {
     console.warn('[Google Charts] load failed:', gcErr);
   }
 
   // ── Flatpickr (วัน+เวลา) — [Feat 2026-09-23] แทนที่ช่องกรอกวันที่แบบ
   // พิมพ์เอง DD/MM/YYYY เดิม ด้วยตัวเลือกวันและเวลาจริง ──
-  let _fpDue, _fpResched;
+  let _fpDue, _fpResched, _fpCreated;
   try {
     const fpOpts = {
       dateFormat:        'd/m/Y H:i',
@@ -382,9 +466,10 @@
     };
     _fpDue     = flatpickr('#wl-due-date', fpOpts);
     _fpResched = flatpickr('#wl-resched-new-date', fpOpts);
+    _fpCreated = flatpickr('#wl-created-at', fpOpts);
   } catch (fpErr) {
     console.warn('[Flatpickr] init failed, falling back to plain text input:', fpErr);
-    _fpDue = null; _fpResched = null;
+    _fpDue = null; _fpResched = null; _fpCreated = null;
   }
 
   // แปลง "DD/MM/YYYY HH:mm" (ค่าจาก flatpickr) → "YYYY-MM-DD HH:mm" (รูปแบบเก็บใน Sheet)
@@ -403,6 +488,26 @@
     if (!m) return s;
     const [, y, mo, d, h, mi] = m;
     return h ? (d + '/' + mo + '/' + y + ' ' + h + ':' + mi) : (d + '/' + mo + '/' + y);
+  }
+
+  // ── ตัวช่วยวันเวลาที่ใช้ร่วมกันระหว่าง การจัดกลุ่มตามเดือน (ข้อ 6) และ
+  // ตัวกรองช่วงเวลา/Timeline ของ Dashboard (ข้อ 2/7) — [Feat 2026-09-24 รอบ 2]
+  function _wlParseDT(raw) {
+    if (!raw) return null;
+    const d = new Date(String(raw).replace(' ', 'T'));
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  const WL_TH_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+
+  function _wlMonthKey(raw) {
+    const d = _wlParseDT(raw);
+    return d ? (d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0')) : '0000-00';
+  }
+
+  function _wlMonthLabel(key) {
+    const [y, m] = key.split('-').map(Number);
+    return y ? (WL_TH_MONTHS[m-1] + ' ' + y) : 'ไม่ทราบวันที่';
   }
 
   // ── INTERNAL WORK LOG (บันทึกงานภายใน) ──────────────────────
@@ -487,6 +592,267 @@
     cats.forEach(c => { if ((counts[c]||0) > topN) { topN = counts[c]||0; topCat = c; } });
     document.getElementById('wl-dash-highlight').textContent = topN > 0
       ? `หมวดที่มีงานมากที่สุด: ${topCat} (${topN} งาน)` : '';
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // ── ข้อ 1/2/5/7 (backlog รอบ 2): แท็บ Dashboard — ตัวกรองช่วงเวลา,
+  // ภาระงานต่อคน, ระยะเวลาเฉลี่ยต่อหมวดหมู่, Timeline งานพร้อมกันต่อคน,
+  // การ์ดสถิติ และ PDF เฉพาะแท็บนี้ ══════════════════════════════════
+
+  let _wlDashboardTabActive = false;
+
+  function switchWlTab(tab) {
+    _wlDashboardTabActive = (tab === 'dashboard');
+    document.getElementById('wl-tab-btn-list').classList.toggle('active', tab === 'list');
+    document.getElementById('wl-tab-btn-dashboard').classList.toggle('active', tab === 'dashboard');
+    document.getElementById('wl-tab-list').style.display      = tab === 'list' ? '' : 'none';
+    document.getElementById('wl-tab-dashboard').style.display = tab === 'dashboard' ? '' : 'none';
+    if (_wlDashboardTabActive) refreshWlDashboard();
+  }
+
+  // ── ตัวกรองช่วงเวลา ────────────────────────────────────────────
+  let wlPeriod = { mode: 'week', start: null, end: null };
+  let _fpWlCustomRange;
+
+  function _wlStartOfDay(d) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
+  function _wlEndOfDay(d)   { const x = new Date(d); x.setHours(23,59,59,999); return x; }
+  function _wlStartOfWeek(d) {
+    const x = _wlStartOfDay(d);
+    const day = x.getDay(); // 0=อาทิตย์ .. 6=เสาร์ — สัปดาห์เริ่มวันจันทร์ ให้ตรงกับ CONFIG.WORK.WORK_DAYS
+    x.setDate(x.getDate() + (day === 0 ? -6 : 1) - day);
+    return x;
+  }
+  function _wlStartOfMonth(d) { const x = new Date(d.getFullYear(), d.getMonth(), 1); x.setHours(0,0,0,0); return x; }
+  function _wlEndOfMonth(d)   { const x = new Date(d.getFullYear(), d.getMonth()+1, 0); x.setHours(23,59,59,999); return x; }
+
+  function setWlPeriod(mode) {
+    document.querySelectorAll('.wl-period-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById('wl-period-btn-' + mode);
+    if (btn) btn.classList.add('active');
+    const customInput = document.getElementById('wl-period-custom-range');
+    const now = new Date();
+
+    if (mode === 'today') {
+      wlPeriod = { mode, start: _wlStartOfDay(now), end: _wlEndOfDay(now) };
+      customInput.style.display = 'none';
+    } else if (mode === 'week') {
+      const start = _wlStartOfWeek(now);
+      wlPeriod = { mode, start, end: _wlEndOfDay(new Date(start.getTime() + 6*86400000)) };
+      customInput.style.display = 'none';
+    } else if (mode === 'month') {
+      wlPeriod = { mode, start: _wlStartOfMonth(now), end: _wlEndOfMonth(now) };
+      customInput.style.display = 'none';
+    } else if (mode === 'custom') {
+      customInput.style.display = '';
+      if (!_fpWlCustomRange) {
+        try {
+          _fpWlCustomRange = flatpickr(customInput, {
+            mode: 'range', dateFormat: 'd/m/Y',
+            locale: (typeof flatpickr !== 'undefined' && flatpickr.l10ns && flatpickr.l10ns.th) ? 'th' : 'default',
+            onClose: (dates) => {
+              if (dates.length === 2) {
+                wlPeriod = { mode: 'custom', start: _wlStartOfDay(dates[0]), end: _wlEndOfDay(dates[1]) };
+                refreshWlDashboard();
+              }
+            }
+          });
+        } catch (e) { console.warn('[Flatpickr] custom range init failed:', e); }
+      }
+      return; // รอ user เลือกช่วงวันที่ก่อนค่อย refresh
+    }
+    refreshWlDashboard();
+  }
+
+  // ── ช่วงเวลาที่งานแต่ละชิ้น "อยู่" (เวลาเริ่มงาน → เสร็จ/กำหนดส่ง/ปัจจุบัน)
+  // ใช้ทั้งกรองช่วงเวลาของ Dashboard และวาด Timeline ──
+  function _wlItemSpan(w) {
+    const start = _wlParseDT(w.created_at) || _wlParseDT(w.due_date) || new Date();
+    let end;
+    if (w.status === '✅ เสร็จแล้ว' && w.done_at) end = _wlParseDT(w.done_at) || new Date();
+    else end = _wlParseDT(w.due_date) || new Date();
+    if (end < start) end = start; // กันข้อมูลเพี้ยน เช่น กำหนดส่งเก่ากว่าเวลาเริ่มงาน
+    return { start, end };
+  }
+
+  function _wlItemsInPeriod() {
+    if (!wlPeriod.start || !wlPeriod.end) return allWorklog;
+    return allWorklog.filter(w => {
+      const { start, end } = _wlItemSpan(w);
+      return start <= wlPeriod.end && end >= wlPeriod.start;
+    });
+  }
+
+  function refreshWlDashboard() {
+    if (!wlPeriod.start) { setWlPeriod('week'); return; } // setWlPeriod จะเรียก refresh ต่อเองอยู่แล้ว
+    drawWorklogCategoryChart();
+    renderWlStatCards();
+    drawWorklogStaffChart();
+    drawWorklogDurationChart();
+    drawWorklogTimelineChart();
+  }
+
+  // ── การ์ดสถิติ (ข้อ 7: ภาระงาน/เลื่อนบ่อย/ทำพร้อมกันสูงสุด) ──────────
+  function renderWlStatCards() {
+    const wrap = document.getElementById('wl-stat-cards');
+    if (!wrap) return;
+    const items = _wlItemsInPeriod();
+
+    const overdueCount     = items.filter(w => wlStatusColor(w) === '🔴').length;
+    const frequentReschedCount = items.filter(w => (w.reschedule_count||0) >= 3).length;
+    const peak = _wlPeakConcurrency(items);
+
+    wrap.innerHTML = `
+      <div class="wl-stat-card"><div class="wl-stat-value">${items.length}</div><div class="wl-stat-label">งานในช่วงเวลานี้</div></div>
+      <div class="wl-stat-card"><div class="wl-stat-value" style="color:#c62828">${overdueCount}</div><div class="wl-stat-label">🔴 เลยกำหนด</div></div>
+      <div class="wl-stat-card"><div class="wl-stat-value" style="color:#e65100">${frequentReschedCount}</div><div class="wl-stat-label">เลื่อนกำหนด ≥3 ครั้ง</div></div>
+      <div class="wl-stat-card"><div class="wl-stat-value">${peak.max}</div><div class="wl-stat-label">งานพร้อมกันสูงสุด${peak.person ? ' — ' + _wlEscapeHtml(peak.person) : ''}</div></div>
+    `;
+  }
+
+  // หา "จำนวนงานที่ซ้อนทับกันในเวลาเดียวกันมากที่สุด" ต่อคน แบบ sweep-line
+  // (นับทีละคน แล้วเทียบหาค่ามากสุดรวม) — ใช้ _wlItemSpan() ตัวเดียวกับ Timeline
+  function _wlPeakConcurrency(items) {
+    const byPerson = {};
+    items.forEach(w => { const p = w.assigned_to || '(ไม่ระบุ)'; (byPerson[p] = byPerson[p] || []).push(w); });
+
+    let best = { max: 0, person: '' };
+    Object.keys(byPerson).forEach(person => {
+      const events = [];
+      byPerson[person].forEach(w => {
+        const { start, end } = _wlItemSpan(w);
+        events.push([start.getTime(), 1], [end.getTime(), -1]);
+      });
+      events.sort((a,b) => a[0] - b[0] || a[1] - b[1]);
+      let cur = 0, max = 0;
+      events.forEach(e => { cur += e[1]; if (cur > max) max = cur; });
+      if (max > best.max) best = { max, person: (wlUsers.find(u=>u.email===person)||{}).display_name || person };
+    });
+    return best;
+  }
+
+  // ── ภาระงานต่อคน (เสร็จ vs ค้างอยู่ ในช่วงเวลาที่เลือก) ──────────────
+  function drawWorklogStaffChart() {
+    if (!_wlChartsLoaded || typeof google === 'undefined' || !google.visualization) return;
+    const el = document.getElementById('worklog-staff-chart');
+    if (!el) return;
+    const items = _wlItemsInPeriod();
+    if (!items.length) { el.innerHTML = '<div class="empty-state fs-12">ไม่มีงานในช่วงเวลานี้</div>'; return; }
+
+    const byPerson = {};
+    items.forEach(w => {
+      const p = (wlUsers.find(u=>u.email===w.assigned_to)||{}).display_name || w.assigned_to || '(ไม่ระบุ)';
+      if (!byPerson[p]) byPerson[p] = { done: 0, open: 0 };
+      byPerson[p][w.status === '✅ เสร็จแล้ว' ? 'done' : 'open']++;
+    });
+    const people = Object.keys(byPerson).sort((a,b) => (byPerson[b].done+byPerson[b].open) - (byPerson[a].done+byPerson[a].open));
+
+    const dt = new google.visualization.DataTable();
+    dt.addColumn('string', 'คน');
+    dt.addColumn('number', 'เสร็จแล้ว');
+    dt.addColumn('number', 'ยังไม่เสร็จ');
+    people.forEach(p => dt.addRow([p, byPerson[p].done, byPerson[p].open]));
+
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    new google.visualization.BarChart(el).draw(dt, {
+      isStacked: true,
+      legend: { position: 'top', textStyle: { fontSize:11, color: isDark?'#aaa':'#666' } },
+      colors: ['#1baf7a', '#eda100'],
+      backgroundColor: 'transparent',
+      hAxis: { minValue:0, gridlines:{color:isDark?'#333':'#f0f0f0'}, textStyle:{fontSize:10,color:isDark?'#aaa':'#666'} },
+      vAxis: { textStyle: { fontSize:11, color: isDark?'#ddd':'#333' } },
+      chartArea: { left:120, right:24, top:24, bottom:32 }
+    });
+  }
+
+  // ── ระยะเวลาทำงานเฉลี่ยต่อหมวดหมู่ (เฉพาะงานที่เสร็จแล้วในช่วงเวลาที่เลือก) ──
+  function drawWorklogDurationChart() {
+    if (!_wlChartsLoaded || typeof google === 'undefined' || !google.visualization) return;
+    const el = document.getElementById('worklog-duration-chart');
+    if (!el) return;
+    const doneItems = _wlItemsInPeriod().filter(w => w.status === '✅ เสร็จแล้ว' && w.done_at && w.created_at);
+    if (!doneItems.length) { el.innerHTML = '<div class="empty-state fs-12">ยังไม่มีงานที่เสร็จแล้วในช่วงเวลานี้</div>'; return; }
+
+    const byCategory = {};
+    doneItems.forEach(w => {
+      const start = _wlParseDT(w.created_at), end = _wlParseDT(w.done_at);
+      if (!start || !end) return;
+      const hours = Math.max(0, (end - start) / 3600000);
+      const cat = w.category || 'อื่นๆ';
+      (byCategory[cat] = byCategory[cat] || []).push(hours);
+    });
+    const cats = Object.keys(byCategory);
+    if (!cats.length) { el.innerHTML = '<div class="empty-state fs-12">ยังไม่มีข้อมูล</div>'; return; }
+
+    const dt = new google.visualization.DataTable();
+    dt.addColumn('string', 'หมวดหมู่');
+    dt.addColumn('number', 'ชั่วโมงเฉลี่ย');
+    dt.addColumn({ type:'number', role:'annotation' });
+    cats.forEach(c => {
+      const arr = byCategory[c];
+      const avg = Math.round((arr.reduce((a,b)=>a+b,0) / arr.length) * 10) / 10;
+      dt.addRow([c, avg, avg]);
+    });
+
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    new google.visualization.BarChart(el).draw(dt, {
+      legend: { position: 'none' },
+      colors: [WL_CATEGORY_COLORS[0]],
+      backgroundColor: 'transparent',
+      hAxis: { minValue:0, title:'ชั่วโมง', gridlines:{color:isDark?'#333':'#f0f0f0'}, textStyle:{fontSize:10,color:isDark?'#aaa':'#666'} },
+      vAxis: { textStyle: { fontSize:11, color: isDark?'#ddd':'#333' } },
+      chartArea: { left:120, right:40, top:16, bottom:32 },
+      annotations: { textStyle:{fontSize:11, color:isDark?'#eee':'#222', bold:true} }
+    });
+  }
+
+  // ── Timeline งานที่ทำพร้อมกันต่อคน (ข้อ 2 backlog รอบ 2) ─────────────
+  // ใช้ google.visualization.Timeline — แถว = คน, แท่ง = งาน 1 ชิ้น ช่วง
+  // "เวลาเริ่มงาน" (created_at) ถึง "เสร็จ/กำหนดส่ง/ปัจจุบัน" (ดู _wlItemSpan())
+  // แท่งที่ซ้อนกันในแถวเดียวกัน = งานที่คนคนนั้นทำพร้อมกันจริง
+  function drawWorklogTimelineChart() {
+    if (!_wlChartsLoaded || typeof google === 'undefined' || !google.visualization || !google.visualization.Timeline) return;
+    const el = document.getElementById('worklog-timeline-chart');
+    if (!el) return;
+    const items = _wlItemsInPeriod();
+    if (!items.length) { el.innerHTML = '<div class="empty-state fs-12">ไม่มีงานในช่วงเวลานี้</div>'; el.style.height = '80px'; return; }
+
+    const dt = new google.visualization.DataTable();
+    dt.addColumn({ type: 'string', id: 'คน' });
+    dt.addColumn({ type: 'string', id: 'งาน' });
+    dt.addColumn({ type: 'string', role: 'tooltip' });
+    dt.addColumn({ type: 'date', id: 'เริ่ม' });
+    dt.addColumn({ type: 'date', id: 'สิ้นสุด' });
+
+    const rows = items.map(w => {
+      const { start, end } = _wlItemSpan(w);
+      const person = (wlUsers.find(u=>u.email===w.assigned_to)||{}).display_name || w.assigned_to || '(ไม่ระบุ)';
+      const tooltip = `${w.title}\n${w.category||''}\n${fmtWLDueDate(w.created_at)} → ${w.status==='✅ เสร็จแล้ว'?'เสร็จ':'กำหนดส่ง'} ${fmtWLDueDate(w.status==='✅ เสร็จแล้ว'?w.done_at:w.due_date)}`;
+      return [person, w.title, tooltip, start, end];
+    });
+    // เรียงตามคนเพื่อให้แถวกลุ่มติดกัน อ่านง่าย
+    rows.sort((a,b) => a[0].localeCompare(b[0]));
+    dt.addRows(rows);
+
+    const uniquePeople = new Set(rows.map(r => r[0])).size;
+    el.style.height = Math.max(120, uniquePeople * 41 + 40) + 'px';
+
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    new google.visualization.Timeline(el).draw(dt, {
+      backgroundColor: 'transparent',
+      colors: WL_CATEGORY_COLORS,
+      timeline: { showRowLabels: true, rowLabelStyle: { fontSize:11, color: isDark?'#ddd':'#333' }, barLabelStyle: { fontSize:10 } }
+    });
+  }
+
+  // ── PDF เฉพาะแท็บ Dashboard (ข้อ 5 backlog รอบ 2) — ใช้ window.print()
+  // เหมือน exportWorklogPDF() เดิม แต่สลับ CSS ผ่าน body class ก่อนพิมพ์
+  // (ดู @media print ด้านบน) เพื่อพิมพ์ Dashboard แทนตารางรายการงาน ──
+  function exportWorklogDashboardPDF() {
+    document.body.classList.add('wl-printing-dashboard');
+    window.print();
+    // ปุ่ม/dialog พิมพ์เป็น modal แบบ synchronous ในเบราว์เซอร์ส่วนใหญ่ แต่กัน
+    // ไว้เผื่อบาง browser คืนค่าก่อนพิมพ์เสร็จ ด้วย setTimeout สั้นๆ
+    setTimeout(() => document.body.classList.remove('wl-printing-dashboard'), 1000);
   }
 
   // ── ข้อ 5: จัดการหมวดหมู่ (IT_MANAGER เท่านั้น — ปุ่ม ⚙️ จัดการหมวดหมู่) ──
@@ -668,28 +1034,29 @@
     allWorklog = res.success ? res.data : [];
     renderWorklog();
     drawWorklogCategoryChart();
+    // ถ้า user คลิกไปแท็บ Dashboard ไว้ก่อนที่ loadWorklog() จะโหลดเสร็จ (เช่น
+    // คลิกเร็วตอนหน้าเว็บเพิ่งเปิด) ให้ refresh dashboard ให้ด้วยเลย ไม่งั้นจะ
+    // ค้างที่ empty state เก่าจนกว่าจะสลับแท็บไปมาอีกรอบ
+    if (_wlDashboardTabActive) refreshWlDashboard();
   }
 
-  function renderWorklog() {
-    const catFilter = document.getElementById('wl-filter-category')?.value || '';
-    const stFilter  = document.getElementById('wl-filter-status')?.value || '';
-    let items = allWorklog;
-    if (catFilter) items = items.filter(w => w.category === catFilter);
-    if (stFilter)  items = items.filter(w => w.status === stFilter);
+  // [Feat 2026-09-24] ข้อ 6 (backlog รอบ 2): จำว่าเดือนไหนกาง/พับอยู่ ระหว่าง
+  // session (ไม่ persist ข้าม reload — แค่ไม่ให้พับกลับเองทุกครั้งที่ filter
+  // เปลี่ยน) เริ่มต้นกางแค่เดือนปัจจุบันเดือนเดียว เดือนเก่าพับหมด
+  let wlExpandedMonths = null;
 
-    // เรียงงานที่ยังไม่เสร็จและใกล้/เลยกำหนดไว้บนสุด
-    items = items.slice().sort((a,b) => {
-      const order = { '🔴':0, '🟡':1, '🟢':2, '':3 };
-      return order[wlStatusColor(a)] - order[wlStatusColor(b)];
-    });
+  function toggleWlMonth(key) {
+    if (wlExpandedMonths.has(key)) wlExpandedMonths.delete(key); else wlExpandedMonths.add(key);
+    renderWorklog();
+  }
 
-    document.getElementById('worklog-tbody').innerHTML = items.length ? items.map(w => {
-      const color   = wlStatusColor(w);
-      const bg      = WL_COLOR_BG[color];
-      const fg      = WL_COLOR_FG[color];
-      const canDelete = isManager();
-      return `
-      <tr>
+  function _wlRenderRow(w, monthKey, expanded) {
+    const color     = wlStatusColor(w);
+    const bg        = WL_COLOR_BG[color];
+    const fg        = WL_COLOR_FG[color];
+    const canDelete = isManager();
+    return `
+      <tr class="${expanded ? '' : 'wl-month-item-hidden'}" data-month="${monthKey}">
         <td class="fs-12 text-muted">${w.log_no||'—'}</td>
         <td><div class="fw-600 fs-13">${w.title}</div>${w.linked_ticket_id?`<div class="text-muted fs-11">🎫 ${w.linked_ticket_id}</div>`:''}${wlAttachmentCount(w)?`<div class="text-muted fs-11">📎 ${wlAttachmentCount(w)} ไฟล์</div>`:''}</td>
         <td class="fs-12">${w.category||'—'}</td>
@@ -707,7 +1074,42 @@
           </div>
         </td>
       </tr>`;
-    }).join('') : '<tr><td colspan="8" class="text-center" style="padding:40px"><div class="empty-state"><div class="empty-icon">📋</div><h3>ยังไม่มีบันทึกงาน</h3></div></td></tr>';
+  }
+
+  function renderWorklog() {
+    const catFilter = document.getElementById('wl-filter-category')?.value || '';
+    const stFilter  = document.getElementById('wl-filter-status')?.value || '';
+    let items = allWorklog;
+    if (catFilter) items = items.filter(w => w.category === catFilter);
+    if (stFilter)  items = items.filter(w => w.status === stFilter);
+
+    // เรียงงานที่ยังไม่เสร็จและใกล้/เลยกำหนดไว้บนสุด (ภายในแต่ละเดือน)
+    items = items.slice().sort((a,b) => {
+      const order = { '🔴':0, '🟡':1, '🟢':2, '':3 };
+      return order[wlStatusColor(a)] - order[wlStatusColor(b)];
+    });
+
+    const tbody = document.getElementById('worklog-tbody');
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="padding:40px"><div class="empty-state"><div class="empty-icon">📋</div><h3>ยังไม่มีบันทึกงาน</h3></div></td></tr>';
+      return;
+    }
+
+    if (!wlExpandedMonths) wlExpandedMonths = new Set([_wlMonthKey(new Date().toISOString())]);
+
+    const groups = {};
+    items.forEach(w => { const key = _wlMonthKey(w.created_at); (groups[key] = groups[key] || []).push(w); });
+    const sortedKeys = Object.keys(groups).sort().reverse(); // เดือนใหม่ → เก่า
+
+    tbody.innerHTML = sortedKeys.map(key => {
+      const groupItems = groups[key];
+      const expanded    = wlExpandedMonths.has(key);
+      const monthHeader = `
+        <tr class="wl-month-row${expanded?'':' collapsed'}" onclick="toggleWlMonth('${key}')">
+          <td colspan="8"><span class="wl-month-caret">▾</span>${_wlMonthLabel(key)} (${groupItems.length} รายการ)</td>
+        </tr>`;
+      return monthHeader + groupItems.map(w => _wlRenderRow(w, key, expanded)).join('');
+    }).join('');
   }
 
   // ── ไฟล์แนบ (ข้อ 1 ของ feature request เพิ่มเติม 2026-09-24) ─────────────
@@ -807,6 +1209,26 @@
     document.getElementById('wl-status-group').style.display = item ? '' : 'none';
     if (item) document.getElementById('wl-status').value = item.status;
 
+    // [Feat 2026-09-24] ข้อ 3 (backlog รอบ 2): เวลาเริ่มงาน — แก้ไขได้เฉพาะ
+    // IT_MANAGER และเฉพาะตอนแก้ไขงานที่มีอยู่แล้ว (งานใหม่ตั้งอัตโนมัติเสมอ)
+    const createdEditGroup = document.getElementById('wl-created-at-group');
+    const createdRoGroup   = document.getElementById('wl-created-at-readonly-group');
+    if (item && isManager()) {
+      createdEditGroup.style.display = '';
+      createdRoGroup.style.display   = 'none';
+      const createdDate = item.created_at ? new Date(String(item.created_at).replace(' ','T')) : null;
+      if (_fpCreated && createdDate && !isNaN(createdDate.getTime())) _fpCreated.setDate(createdDate, false);
+      else if (_fpCreated) _fpCreated.clear();
+      else document.getElementById('wl-created-at').value = fmtWLDueDate(item.created_at);
+    } else if (item) {
+      createdEditGroup.style.display = 'none';
+      createdRoGroup.style.display   = '';
+      document.getElementById('wl-created-at-readonly').textContent = fmtWLDueDate(item.created_at);
+    } else {
+      createdEditGroup.style.display = 'none';
+      createdRoGroup.style.display   = 'none';
+    }
+
     document.getElementById('wl-attachment-input').value = '';
     renderWlAttachmentList(item);
 
@@ -822,7 +1244,7 @@
     try {
       let res;
       if (logId) {
-        res = await API.post('worklog/update', {
+        const updatePayload = {
           id: logId,
           title: title,
           category: document.getElementById('wl-category').value,
@@ -830,7 +1252,15 @@
           assigned_to: document.getElementById('wl-assigned-to').value,
           status: document.getElementById('wl-status').value,
           linked_ticket_id: document.getElementById('wl-linked-ticket').value
-        });
+        };
+        // ข้อ 3 (backlog รอบ 2): ส่ง created_at ก็ต่อเมื่อเป็น IT_MANAGER และช่อง
+        // แก้ไขกำลังแสดงอยู่จริง (พนักงานเห็นแค่ readonly ไม่มีช่องนี้ให้กรอก)
+        if (isManager() && document.getElementById('wl-created-at-group').style.display !== 'none') {
+          const createdAt = parseWLDueDate(document.getElementById('wl-created-at').value);
+          if (!createdAt) { showToast('รูปแบบเวลาเริ่มงานไม่ถูกต้อง','warning'); hideLoader(); return; }
+          updatePayload.created_at = createdAt;
+        }
+        res = await API.post('worklog/update', updatePayload);
       } else {
         const dueDate = parseWLDueDate(document.getElementById('wl-due-date').value);
         if (!dueDate) { showToast('กรุณาเลือกวันและเวลากำหนดส่ง','warning'); hideLoader(); return; }
@@ -917,6 +1347,7 @@
         <span class="badge" style="background:#e6f4ea;color:#137333">✅ เสร็จสัปดาห์นี้ ${(stats.done_this_week||[]).length}</span>
         <span class="badge" style="background:#e8f0fe;color:#1a73e8">📝 ค้างอยู่ ${(stats.still_open||[]).length}</span>
         <span class="badge" style="background:#fce8e6;color:#c62828">🔴 เลยกำหนด ${(stats.overdue||[]).length}</span>
+        ${stats.avg_duration_hours_done_this_week != null ? `<span class="badge" style="background:#fff3e0;color:#e65100">⏱️ เฉลี่ย ${stats.avg_duration_hours_done_this_week} ชม./งาน</span>` : ''}
       </div>
       <div style="white-space:pre-line;font-size:13px;line-height:1.7">${res.data.summary||'—'}</div>
     `;
