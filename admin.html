@@ -231,6 +231,18 @@
               <option value="WORKLOG_CATEGORY_UPDATE">แก้ไขหมวดหมู่งานภายใน</option>
               <option value="WORKLOG_RESCHEDULE_ALERT">แจ้งเตือนเลื่อนกำหนดบ่อย (อัตโนมัติ)</option>
               <option value="ATTACH_WORKLOG_FILE">แนบไฟล์งานภายใน</option>
+              <option value="EXPORT_TICKET">Export Ticket (PDF/ZIP)</option>
+              <option value="UPDATE_TICKET">แก้ไข Ticket</option>
+              <option value="DELETE_TICKET">ลบ Ticket</option>
+              <option value="ATTACH_FILE">แนบไฟล์ Ticket</option>
+              <option value="UPLOAD_COMPLETION_IMAGE">อัปโหลดรูปยืนยันงาน</option>
+              <option value="SATISFACTION_SCORE">ให้คะแนน</option>
+              <option value="SURVEY_RESEND">ส่งแบบประเมินซ้ำ</option>
+              <option value="SLA_UPDATE">อัปเดต SLA</option>
+              <option value="REGISTER_USER">ลงทะเบียนผู้ใช้</option>
+              <option value="UPDATE_USER_INFO">แก้ไขข้อมูลผู้ใช้</option>
+              <option value="FAQ_CREATED">สร้าง FAQ</option>
+              <option value="WORKLOG_WEEKLY_SUMMARY">สรุปงานภายในรายสัปดาห์ (AI)</option>
             </select>
           </div>
         </div>
@@ -802,14 +814,22 @@
     // [Feat 2026-09-24] ข้อ 5/7c ของ backlog
     WORKLOG_CATEGORY_UPDATE:'แก้ไขหมวดหมู่งานภายใน',
     WORKLOG_RESCHEDULE_ALERT:'แจ้งเตือนเลื่อนกำหนดบ่อย (อัตโนมัติ)',
-    ATTACH_WORKLOG_FILE:'แนบไฟล์งานภายใน'
+    ATTACH_WORKLOG_FILE:'แนบไฟล์งานภายใน',
+    // [Feat 2026-09-28] Export Ticket เป็น PDF (+ ZIP ไฟล์แนบ) — IT_MANAGER
+    EXPORT_TICKET:'Export Ticket (PDF/ZIP)',
+    // [Fix 2026-09-28] action ที่ backend บันทึกอยู่แล้วแต่หน้านี้ไม่มีชื่อ/ไอคอน/ตัวกรอง
+    ATTACH_FILE:'แนบไฟล์ Ticket', UPLOAD_COMPLETION_IMAGE:'อัปโหลดรูปยืนยันงาน',
+    SURVEY_RESEND:'ส่งแบบประเมินซ้ำ', REGISTER_USER:'ลงทะเบียนผู้ใช้',
+    UPDATE_USER_INFO:'แก้ไขข้อมูลผู้ใช้', DELETE_TICKET:'ลบ Ticket'
   };
   const AUDIT_ICON = {
     CREATE_TICKET:'🎫', UPDATE_STATUS:'🔄', CLOSE_TICKET:'✅', ASSIGN_TICKET:'👤',
     ADD_RESOLUTION:'💡', UPDATE_ROLE:'🔑', SLA_BREACH:'🚨', KB_APPROVED:'📚',
     CREATE_WORKLOG:'📋', UPDATE_WORKLOG:'✏️', RESCHEDULE_WORKLOG:'🔁', DELETE_WORKLOG:'🗑️',
     WORKLOG_WEEKLY_SUMMARY:'🤖', WORKLOG_CATEGORY_UPDATE:'🏷️', WORKLOG_RESCHEDULE_ALERT:'📧',
-    ATTACH_WORKLOG_FILE:'📎',
+    ATTACH_WORKLOG_FILE:'📎', EXPORT_TICKET:'📄',
+    ATTACH_FILE:'📎', UPLOAD_COMPLETION_IMAGE:'📷', SURVEY_RESEND:'📨', REGISTER_USER:'🆕',
+    UPDATE_USER_INFO:'📝', DELETE_TICKET:'🗑️', UPDATE_TICKET:'✏️', SATISFACTION_SCORE:'⭐', SLA_UPDATE:'⏱️',
     CONFIG_UPDATE:'⚙️', CREATE_USER:'👥', USER_LOGIN:'🔐', FAQ_CREATED:'❓'
   };
 

@@ -259,6 +259,8 @@
     </div>
     <div class="modal-header">
       <span class="modal-title" id="detail-modal-title">รายละเอียด Ticket</span>
+      <!-- [Feat 2026-09-28] Export PDF — IT_MANAGER เท่านั้น (ซ่อน/แสดงใน renderTicketDetail) -->
+      <button class="btn btn-secondary btn-sm" id="detail-export-btn" style="display:none;margin-left:auto;margin-right:10px" onclick="openExportModal()">📄 Export PDF</button>
       <button class="modal-close" onclick="closeModal('ticket-detail-modal')">×</button>
     </div>
     <div class="modal-body" id="ticket-detail-content" style="padding:0">
@@ -493,6 +495,33 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('score-modal')">ยกเลิก</button>
       <button class="btn btn-primary" onclick="submitScore()">⭐ ส่งคะแนน</button>
+    </div>
+  </div>
+</div>
+
+<!-- [Feat 2026-09-28] Export Ticket เป็น PDF (+ ZIP ไฟล์แนบ) — IT_MANAGER เท่านั้น -->
+<div class="modal-overlay" id="export-ticket-modal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <span class="modal-title">📄 Export Ticket <span id="ex-ticket-id" style="font-weight:400"></span></span>
+      <button class="modal-close" onclick="closeModal('export-ticket-modal')">×</button>
+    </div>
+    <div class="modal-body" style="font-size:14px;line-height:2">
+      <div class="text-muted fs-12" style="margin-bottom:4px">หัวข้อในเอกสาร PDF</div>
+      <label style="display:block;opacity:.7"><input type="checkbox" checked disabled> ข้อมูลพื้นฐาน + รายละเอียดปัญหา (ใส่เสมอ)</label>
+      <label style="display:block"><input type="checkbox" id="ex-resolution"> วิธีแก้ไข</label>
+      <label style="display:block"><input type="checkbox" id="ex-files"> รายชื่อไฟล์แนบ <span class="text-muted fs-12" id="ex-files-count"></span></label>
+      <label style="display:block"><input type="checkbox" id="ex-rootcause"> Root Cause (ข้อมูลภายใน)</label>
+      <label style="display:block"><input type="checkbox" id="ex-chat"> Chat Log</label>
+      <label style="display:block"><input type="checkbox" id="ex-audit"> ประวัติการแก้ไข</label>
+      <div class="text-muted fs-12" style="margin:10px 0 4px;border-top:1px solid var(--border);padding-top:8px">ดาวน์โหลดไฟล์ (ZIP แยกจาก PDF)</div>
+      <label style="display:block"><input type="checkbox" id="ex-zip-attach"> ไฟล์แนบจากผู้แจ้ง <span class="text-muted fs-12" id="ex-zip-attach-count"></span></label>
+      <label style="display:block"><input type="checkbox" id="ex-zip-comp"> รูปยืนยันงานจาก IT <span class="text-muted fs-12" id="ex-zip-comp-count"></span></label>
+      <div class="text-muted fs-12" style="margin-top:8px;line-height:1.6">กด Export แล้วจะเปิดแท็บตัวอย่างเอกสาร → กดปุ่ม "บันทึกเป็น PDF" ในแท็บนั้น (เลือก Destination: Save as PDF)</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('export-ticket-modal')">ยกเลิก</button>
+      <button class="btn btn-primary" id="ex-run-btn" onclick="runExport()">📄 Export</button>
     </div>
   </div>
 </div>
@@ -812,6 +841,8 @@
 
   function renderTicketDetail(t, staff) {
     document.getElementById('detail-modal-title').textContent = t.ticket_id;
+    const exBtn = document.getElementById('detail-export-btn');
+    if (exBtn) exBtn.style.display = isManager() ? '' : 'none';
     document.getElementById('detail-title').textContent = t.title;
 
     // Meta
@@ -1148,14 +1179,20 @@
     SLA_BREACH:         'SLA เกินกำหนด',
     CONFIG_UPDATE:      'แก้ไขการตั้งค่าระบบ',
     FAQ_CREATED:        'สร้าง FAQ ใหม่',
-    FAQ_UPDATED:        'แก้ไข FAQ'
+    FAQ_UPDATED:        'แก้ไข FAQ',
+    EXPORT_TICKET:      'Export Ticket (PDF/ZIP)',
+    ATTACH_FILE:        'แนบไฟล์ Ticket',
+    UPLOAD_COMPLETION_IMAGE: 'อัปโหลดรูปยืนยันงาน',
+    SURVEY_RESEND:      'ส่งแบบประเมินซ้ำ'
   };
 
   const AUDIT_ACTION_ICON = {
     CREATE_TICKET:      '🎫', UPDATE_TICKET: '✏️', UPDATE_STATUS: '🔄',
     ASSIGN_TICKET:      '👤', CLOSE_TICKET:  '✅', REOPEN_TICKET: '🔁',
     ADD_RESOLUTION:     '💡', SATISFACTION_SCORE: '⭐', SLA_BREACH: '🚨',
-    UPDATE_ROLE:        '🔑', CONFIG_UPDATE: '⚙️', FAQ_CREATED: '❓'
+    UPDATE_ROLE:        '🔑', CONFIG_UPDATE: '⚙️', FAQ_CREATED: '❓',
+    EXPORT_TICKET:      '📄', ATTACH_FILE: '📎', UPLOAD_COMPLETION_IMAGE: '📷',
+    SURVEY_RESEND:      '📨', KB_APPROVED: '📚', SLA_UPDATE: '⏱️'
   };
 
   function formatAuditDetail(action, newValue) {
@@ -1552,6 +1589,199 @@
     } catch(e) { showToast('เกิดข้อผิดพลาด', 'error'); }
     finally { hideLoader(); }
   }
+
+  // ── [Feat 2026-09-28] Export Ticket เป็น PDF + ZIP ไฟล์แนบ (IT_MANAGER เท่านั้น) ──
+  // PDF: สร้างหน้าเอกสารในแท็บใหม่แล้วให้ผู้ใช้ Save as PDF จากหน้าต่าง Print ของเบราว์เซอร์
+  //      (ภาษาไทยแสดงถูกต้อง ไม่ต้องพึ่ง library) — layout ตาม mockup ที่ผู้ใช้อนุมัติ 2026-09-28
+  // ZIP: backend endpoint ticket/attachments-zip (ถูกเรียกทุกครั้งเพื่อบันทึก Audit Log ด้วย)
+  function _exParse(v) { try { const a = (typeof v === 'string') ? JSON.parse(v || '[]') : (v || []); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+  function _exEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
+  function _exDate(v) {
+    if (!v) return '-';
+    const d = new Date(v);
+    if (isNaN(d)) return _exEsc(v);
+    return d.toLocaleString('en-GB', { timeZone:'Asia/Bangkok', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:false }).replace(',', '');
+  }
+  function _exSize(b) { if (!b) return ''; return b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB'; }
+
+  function openExportModal() {
+    if (!isManager() || !currentTicket) return;
+    const t  = currentTicket;
+    const nA = _exParse(t.attachment_urls).length;
+    const nC = _exParse(t.completion_image_urls).length;
+    const set = (id, checked, disabled) => { const el = document.getElementById(id); el.checked = !!checked; el.disabled = !!disabled; };
+    set('ex-resolution', !!t.resolution, !t.resolution);
+    set('ex-files',      nA > 0, nA === 0);
+    set('ex-rootcause',  false, !t.root_cause);
+    set('ex-chat',       false, false);
+    set('ex-audit',      false, false);
+    set('ex-zip-attach', nA > 0, nA === 0);
+    set('ex-zip-comp',   false, nC === 0);
+    document.getElementById('ex-files-count').textContent      = '(' + nA + ' ไฟล์)';
+    document.getElementById('ex-zip-attach-count').textContent = '(' + nA + ' ไฟล์)';
+    document.getElementById('ex-zip-comp-count').textContent   = '(' + nC + ' รูป)';
+    document.getElementById('ex-ticket-id').textContent = t.ticket_id;
+    openModal('export-ticket-modal');
+  }
+
+  function _exDownloadZip(b64, name) {
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([arr], { type:'application/zip' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = name || 'attachments.zip';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+
+  async function runExport() {
+    const t = currentTicket;
+    if (!t || !isManager()) return;
+    const on  = id => { const el = document.getElementById(id); return !!(el && el.checked && !el.disabled); };
+    const opt = { resolution:on('ex-resolution'), files:on('ex-files'), rootcause:on('ex-rootcause'),
+                  chat:on('ex-chat'), audit:on('ex-audit'), zipA:on('ex-zip-attach'), zipC:on('ex-zip-comp') };
+
+    // เปิดแท็บทันทีในจังหวะคลิก (ถ้าเปิดหลัง await เบราว์เซอร์จะบล็อกเป็น pop-up)
+    const w = window.open('', '_blank');
+    if (!w) { showToast('เบราว์เซอร์บล็อกหน้าต่างใหม่ — กรุณาอนุญาต pop-up สำหรับเว็บนี้', 'error'); return; }
+    w.document.write('<p style="font-family:sans-serif;padding:24px">กำลังเตรียมเอกสาร ' + _exEsc(t.ticket_id) + ' ...</p>');
+
+    const btn = document.getElementById('ex-run-btn');
+    btn.disabled = true; btn.textContent = 'กำลังเตรียม...';
+    try {
+      const [chatRes, auditRes, zipRes] = await Promise.all([
+        opt.chat  ? API.get('chatlog', { ticket_id: t.ticket_id }) : Promise.resolve(null),
+        opt.audit ? API.get('audit', { entity_type: 'TICKET', entity_id: t.ticket_id }) : Promise.resolve(null),
+        API.post('ticket/attachments-zip', { ticket_id: t.ticket_id, include_attachments: opt.zipA,
+          include_completion: opt.zipC, sections: Object.keys(opt).filter(k => opt[k]) })
+      ]);
+      const zip = (zipRes && zipRes.success) ? zipRes.data : null;
+
+      w.document.open();
+      w.document.write(_exBuildHtml(t, opt,
+        chatRes && chatRes.success ? chatRes.data : [],
+        auditRes && auditRes.success ? auditRes.data : [], zip));
+      w.document.close();
+
+      if (opt.zipA || opt.zipC) {
+        if (!zip) {
+          showToast('ดาวน์โหลดไฟล์แนบไม่สำเร็จ: ' + ((zipRes && zipRes.data && zipRes.data.error) || 'ไม่ทราบสาเหตุ'), 'error', 6000);
+        } else if (zip.zip_base64) {
+          _exDownloadZip(zip.zip_base64, zip.zip_name);
+          showToast('ดาวน์โหลด ZIP ไฟล์แนบแล้ว (' + zip.count + ' ไฟล์)', 'success');
+        } else if (zip.too_large) {
+          showToast('ไฟล์แนบรวมใหญ่เกิน 20MB — ไม่ได้สร้าง ZIP (ดูลิงก์ไฟล์ในเอกสาร)', 'warning', 6000);
+        }
+        if (zip && zip.errors && zip.errors.length) showToast('ดึงไฟล์จาก Drive ไม่ได้ ' + zip.errors.length + ' ไฟล์', 'warning', 6000);
+      }
+      closeModal('export-ticket-modal');
+    } catch (e) {
+      console.error('[runExport]', e);
+      showToast('Export ไม่สำเร็จ: ' + e.message, 'error');
+      try { w.document.body.innerHTML = '<p style="font-family:sans-serif;padding:24px;color:#b00">Export ไม่สำเร็จ: ' + _exEsc(e.message) + '</p>'; } catch (_) {}
+    } finally {
+      btn.disabled = false; btn.textContent = '📄 Export';
+    }
+  }
+
+  function _exBuildHtml(t, opt, chat, audit, zip) {
+    const e = _exEsc;
+    const secs = [];
+    const sec = (title, body, keep) => secs.push(`<section class="${keep === false ? '' : 'keep'}"><h2>${secs.length + 1}. ${title}</h2>${body}</section>`);
+    const box = s => `<div class="box">${e(s)}</div>`;
+
+    sec('รายละเอียดปัญหา', box(t.description || '-'));
+    if (opt.resolution) sec('วิธีแก้ไข', box(t.resolution));
+    if (opt.rootcause)  sec('Root Cause (สาเหตุ)', box(t.root_cause));
+    if (opt.files) {
+      const zf = zip && zip.files && zip.files.filter(f => f.group === 'attachments');
+      const list = (zf && zf.length)
+        ? zf.map(f => `<li>${e(f.name)} <span class="muted">(${_exSize(f.size)})</span>${zip.too_large ? `<br><span class="muted">${e(f.url)}</span>` : ''}</li>`)
+        : _exParse(t.attachment_urls).map((u, i) => {
+            const item = (typeof u === 'string') ? { url: u, name: '' } : u;
+            return `<li>${e(item.name || ('ไฟล์แนบ ' + (i + 1) + ' (รูปภาพ)'))}</li>`;
+          });
+      sec('ไฟล์แนบ', `<ul>${list.join('')}</ul>`);
+    }
+    if (opt.chat) {
+      const who = { USER:'ผู้แจ้ง', AI:'AI', SYSTEM:'ระบบ', IT:'IT', STAFF:'IT' };
+      const rows = (chat || []).map(l => {
+        const msg = String(l.message || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
+        return `<tr><td class="t">${_exDate(l.timestamp)}</td><td class="w">${e(who[l.message_type] || l.message_type || '-')}</td><td class="box">${e(msg)}</td></tr>`;
+      }).join('') || '<tr><td colspan="3" class="muted">ไม่มี Chat Log</td></tr>';
+      sec('Chat Log', `<table><thead><tr><th>เวลา</th><th>ผู้ส่ง</th><th>ข้อความ</th></tr></thead><tbody>${rows}</tbody></table>`, false);
+    }
+    if (opt.audit) {
+      const rows = (audit || []).slice().reverse().map(l => {
+        let extra = '';
+        try { const nv = typeof l.new_value === 'string' ? JSON.parse(l.new_value || '{}') : (l.new_value || {}); if (nv && nv.status) extra = ' → ' + nv.status; } catch (_) {}
+        const actor = l.actor_email ? String(l.actor_email).split('@')[0] : 'ระบบ';
+        return `<tr><td class="t">${_exDate(l.timestamp)}</td><td class="w">${e(actor)}</td><td>${e((AUDIT_ACTION_TH[l.action] || l.action) + extra)}</td></tr>`;
+      }).join('') || '<tr><td colspan="3" class="muted">ไม่มีประวัติ</td></tr>';
+      sec('ประวัติการแก้ไข', `<table><thead><tr><th>เวลา</th><th>โดย</th><th>การเปลี่ยนแปลง</th></tr></thead><tbody>${rows}</tbody></table>`, false);
+    }
+
+    let slaResult = 'ยังไม่ปิดงาน';
+    if (t.closed_at && t.sla_deadline) {
+      const ok = new Date(t.closed_at) <= new Date(t.sla_deadline);
+      slaResult = (ok ? 'ทันเวลา' : 'เกินกำหนด') + (t.sla_actual_hours ? ` (ใช้ ${Number(t.sla_actual_hours).toFixed(1)} ชม. ทำการ)` : '');
+    }
+    const badge = (txt, cls) => `<span class="badge ${cls}">${e(txt)}</span>`;
+    const summ = [
+      ['สถานะ',        badge((t.status === 'Done' ? '✓ ' : '') + (t.status || '-'), t.status === 'Done' ? 'b-done' : 'b-neutral')],
+      ['ความเร่งด่วน',  badge(t.priority || '-', t.priority === 'Urgent' ? 'b-urgent' : 'b-neutral')],
+      ['ประเภท',       e((t.ticket_type || '-') + (t.kpi_category ? ' (' + t.kpi_category + ')' : ''))],
+      ['ผู้รับผิดชอบ',   e(t.assigned_name || '-')],
+      ['ผู้แจ้ง',        e(t.requester_name || '-')],
+      ['สร้างเมื่อ',      _exDate(t.created_at)],
+      ['SLA Deadline', _exDate(t.sla_deadline)],
+      ['ปิดงานเมื่อ',     _exDate(t.closed_at)],
+      ['ผล SLA',       e(slaResult)], ['', '']
+    ].map(([k, v]) => `<div><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
+
+    const u = getCurrentUser() || {};
+    const nowTxt = _exDate(new Date());
+    const css = `
+@page{size:A4;margin:16mm 14mm 18mm}*{box-sizing:border-box}
+body{font-family:'Sarabun',sans-serif;color:#1a1a1a;font-size:13px;line-height:1.6;margin:0;background:#fff}
+.page{max-width:182mm;margin:0 auto;padding:0 4px}
+.bar{position:sticky;top:0;background:#f3f6f9;border-bottom:1px solid #c9d3de;padding:10px 16px;display:flex;gap:12px;align-items:center;font-size:13px;margin-bottom:16px}
+.bar button{font-family:inherit;font-size:14px;padding:6px 14px;border-radius:6px;border:1px solid #1f4e79;background:#1f4e79;color:#fff;cursor:pointer}
+header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1f4e79;padding-bottom:8px;margin-bottom:14px}
+.brand{font-size:19px;font-weight:700;color:#1f4e79}.doctype{font-size:12px;color:#555}
+.tid{text-align:right}.tid .lbl{font-size:11px;color:#555}.tid .val{font-size:18px;font-weight:700}
+h1{font-size:17px;margin:0 0 10px;font-weight:700}
+.summary{display:grid;grid-template-columns:1fr 1fr;border:1px solid #c9d3de;border-radius:6px;overflow:hidden;margin-bottom:16px;break-inside:avoid}
+.summary div{display:flex;padding:6px 10px;border-bottom:1px solid #e3e8ee}
+.summary div:nth-child(odd){border-right:1px solid #e3e8ee}.summary div:nth-last-child(-n+2){border-bottom:none}
+.summary .k{width:42%;color:#555;flex-shrink:0}.summary .v{font-weight:600}
+.badge{display:inline-block;padding:0 8px;border-radius:10px;font-size:12px;border:1px solid}
+.b-done{color:#1e6b3a;border-color:#1e6b3a;background:#eaf5ee}.b-urgent{color:#9b2c2c;border-color:#9b2c2c;background:#fbeaea}.b-neutral{color:#333;border-color:#999;background:#f5f5f5}
+section{margin-bottom:14px}section.keep{break-inside:avoid}
+h2{font-size:14px;color:#1f4e79;margin:0 0 6px;padding-bottom:3px;border-bottom:1px solid #d7dfe8;break-after:avoid}
+.box{white-space:pre-line;word-break:break-word}.muted{color:#666;font-size:11px}
+ul{margin:0;padding-left:20px}
+table{width:100%;border-collapse:collapse;font-size:12px}thead{display:table-header-group}
+th{background:#eef2f6;text-align:left;padding:5px 8px;border:1px solid #d7dfe8;font-weight:600}
+td{padding:5px 8px;border:1px solid #e3e8ee;vertical-align:top}tr{break-inside:avoid}
+td.t{white-space:nowrap;width:118px;color:#555}td.w{white-space:nowrap;width:110px}
+footer{margin-top:18px;border-top:1px solid #c9d3de;padding-top:6px;font-size:11px;color:#666;display:flex;justify-content:space-between}
+@media print{.bar{display:none}}`;
+
+    return `<!doctype html><html lang="th"><head><meta charset="utf-8"><title>${e(t.ticket_id)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<style>${css}</style></head><body>
+<div class="bar"><button onclick="window.print()">🖨️ บันทึกเป็น PDF</button><span>ในหน้าต่าง Print เลือก Destination: <b>Save as PDF</b></span></div>
+<div class="page">
+<header><div><div class="brand">TCP Smart IT Desk</div><div class="doctype">รายงาน Ticket</div></div>
+<div class="tid"><div class="lbl">Ticket ID</div><div class="val">${e(t.ticket_id)}</div></div></header>
+<h1>${e(t.title)}</h1><div class="summary">${summ}</div>
+${secs.join('\n')}
+<footer><span>Export โดย ${e(u.display_name || u.email || '-')} (IT_MANAGER) · ${nowTxt}</span><span>TCP Smart IT Desk</span></footer>
+</div></body></html>`;
+  }
+
 </script>
 </body>
 </html>
