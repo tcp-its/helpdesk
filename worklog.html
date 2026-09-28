@@ -142,7 +142,7 @@
               </select>
               <select class="form-control" id="wl-filter-status" style="width:140px" onchange="renderWorklog()">
                 <option value="">ทุกสถานะ</option>
-                <option>📝 To Do</option>
+                <option>📝 รอดำเนินการ</option>
                 <option>🔄 กำลังทำ</option>
                 <option>✅ เสร็จแล้ว</option>
               </select>
@@ -268,14 +268,24 @@
       <div class="form-group" id="wl-due-date-group">
         <label class="form-label">กำหนดส่ง <span class="required">*</span></label>
         <input type="text" class="form-control" id="wl-due-date" placeholder="เลือกวันและเวลา">
+        <div class="d-flex gap-8 mt-8">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="wlQuickDue('due',1)">+1 วัน</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="wlQuickDue('due',3)">+3 วัน</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="wlQuickDue('due',7)">+1 สัปดาห์</button>
+        </div>
       </div>
       <div class="form-group" id="wl-status-group" style="display:none">
         <label class="form-label">สถานะ</label>
         <select class="form-control" id="wl-status">
-          <option>📝 To Do</option>
+          <option>📝 รอดำเนินการ</option>
           <option>🔄 กำลังทำ</option>
           <option>✅ เสร็จแล้ว</option>
         </select>
+      </div>
+      <!-- [Change 2026-09-28] ผลการดำเนินงาน (resolution_note) — คอลัมน์มีใน Sheet อยู่แล้ว แต่เดิมไม่มีช่องในหน้าเว็บ -->
+      <div class="form-group" id="wl-resolution-group" style="display:none">
+        <label class="form-label">ผลการดำเนินงาน</label>
+        <textarea class="form-control" id="wl-resolution" rows="4" placeholder="สิ่งที่ทำไปแล้ว / ผลลัพธ์"></textarea>
       </div>
       <div class="form-group">
         <label class="form-label">Ticket ที่เกี่ยวข้อง (ถ้ามี)</label>
@@ -312,6 +322,11 @@
       <div class="form-group">
         <label class="form-label">กำหนดส่งใหม่ <span class="required">*</span></label>
         <input type="text" class="form-control" id="wl-resched-new-date" placeholder="เลือกวันและเวลา">
+        <div class="d-flex gap-8 mt-8">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="wlQuickDue('resched',1)">+1 วัน</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="wlQuickDue('resched',3)">+3 วัน</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="wlQuickDue('resched',7)">+1 สัปดาห์</button>
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label">เหตุผลที่เลื่อน <span class="required">*</span></label>
@@ -483,7 +498,10 @@
   // แสดงผล "YYYY-MM-DD[ HH:mm[:ss]]" (จาก Sheet — รองรับทั้งแถวเก่าที่ไม่มีเวลา) → "DD/MM/YYYY[ HH:mm]"
   function fmtWLDueDate(raw) {
     if (!raw) return '—';
-    const s = String(raw);
+    let s = String(raw);
+    // [Fix 2026-09-28] API ส่งค่าวันที่จาก Sheet กลับมาเป็น ISO UTC (เช่น 2026-09-28T10:00:00.000Z)
+    // เดิมอ่านตัวเลขตรงๆ ทำให้แสดงเร็วกว่าเวลาไทย 7 ชม. — แปลงเป็นเวลาไทยก่อนแสดงเสมอ
+    s = _wlToBkkStr(s);
     const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
     if (!m) return s;
     const [, y, mo, d, h, mi] = m;
@@ -492,6 +510,32 @@
 
   // ── ตัวช่วยวันเวลาที่ใช้ร่วมกันระหว่าง การจัดกลุ่มตามเดือน (ข้อ 6) และ
   // ตัวกรองช่วงเวลา/Timeline ของ Dashboard (ข้อ 2/7) — [Feat 2026-09-24 รอบ 2]
+  // แปลงค่าที่มี timezone (ISO ลงท้าย Z/+hh:mm) → 'YYYY-MM-DD HH:mm' ตามเวลาไทย; ค่าอื่นคืนเดิม
+  function _wlToBkkStr(raw) {
+    const s = String(raw || '');
+    if (!/T\d{2}:\d{2}.*(Z|[+-]\d{2}:?\d{2})$/.test(s)) return s;
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return s;
+    const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit',
+      day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(d)
+      .reduce((a, x) => (a[x.type] = x.value, a), {});
+    return p.year + '-' + p.month + '-' + p.day + ' ' + (p.hour === '24' ? '00' : p.hour) + ':' + p.minute;
+  }
+
+  // [Change 2026-09-28] ปุ่มลัดกำหนดส่ง: วันนี้ + n วัน เวลา 17:00
+  function wlQuickDue(fpName, days) {
+    const fp = fpName === 'resched' ? _fpResched : _fpDue;
+    const d = new Date(); d.setDate(d.getDate() + days); d.setHours(17, 0, 0, 0);
+    if (fp) fp.setDate(d, true);
+    else document.getElementById(fpName === 'resched' ? 'wl-resched-new-date' : 'wl-due-date').value =
+      String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear() + ' 17:00';
+  }
+
+  // ห้ามเลือกวันย้อนหลัง — ยกเว้น IT_MANAGER (บันทึกงานที่เสร็จแล้วย้อนหลังได้)
+  function _wlApplyMinDate(fp) {
+    if (fp) fp.set('minDate', isManager() ? null : 'today');
+  }
+
   function _wlParseDT(raw) {
     if (!raw) return null;
     const d = new Date(String(raw).replace(' ', 'T'));
@@ -991,12 +1035,13 @@
   // [Feat 2026-09-24] Excel: รูปแบบเดียวกับ exportAuditExcel() ใน admin.html
   // (CSV + BOM ให้ Excel เปิดแล้วอ่านภาษาไทยถูกต้อง — ไม่ใช้ไลบรารีเพิ่ม)
   function exportWorklogExcel() {
-    const header = ['เลขที่','ชื่องาน','หมวดหมู่','ผู้รับผิดชอบ','กำหนดส่ง','เลื่อนแล้ว(ครั้ง)','สถานะ','รายละเอียด'];
+    const header = ['เลขที่','ชื่องาน','หมวดหมู่','ผู้รับผิดชอบ','กำหนดส่ง','เลื่อนแล้ว(ครั้ง)','สถานะ','รายละเอียด','ผลการดำเนินงาน'];
     const rows = allWorklog.map(w => [
       w.log_no||'', w.title||'', w.category||'',
       (wlUsers.find(u=>u.email===w.assigned_to)||{}).display_name || w.assigned_to || '',
       fmtWLDueDate(w.due_date), w.reschedule_count||0, w.status||'',
-      String(w.description||'').replace(/"/g,'""').slice(0,300)
+      String(w.description||'').replace(/"/g,'""').slice(0,300),
+      String(w.resolution_note||'').replace(/"/g,'""').slice(0,500)
     ]);
     const csv = '\uFEFF' + [header, ...rows].map(r => r.map(c => '"'+String(c)+'"').join(',')).join('\n');
     const a = document.createElement('a');
@@ -1015,7 +1060,7 @@
   function wlStatusColor(item) {
     if (!item.due_date || item.status === '✅ เสร็จแล้ว') return '';
     const today = new Date(new Date().toLocaleDateString('en-US', {timeZone:'Asia/Bangkok'}));
-    const due   = new Date(String(item.due_date).substring(0,10) + 'T00:00:00');
+    const due   = new Date(_wlToBkkStr(item.due_date).substring(0,10) + 'T00:00:00');
     if (isNaN(due.getTime())) return '';
     const diffDays = Math.round((due - today) / 86400000);
     if (diffDays < 0) return '🔴';
@@ -1063,7 +1108,7 @@
         <td class="fs-12">${(wlUsers.find(u=>u.email===w.assigned_to)||{}).display_name || w.assigned_to || '—'}</td>
         <td><span class="badge" style="background:${bg};color:${fg}">${color?color+' ':''}${fmtWLDueDate(w.due_date)}</span></td>
         <td>${w.reschedule_count ? `<span class="badge" style="background:#fff3e0;color:#e65100">${w.reschedule_count} ครั้ง</span>` : '<span class="text-muted fs-12">—</span>'}</td>
-        <td class="fs-12">${w.status||'—'}</td>
+        <td class="fs-12" style="white-space:nowrap">${w.status||'—'}</td>
         <td>
           <div class="d-flex gap-8">
             <button class="btn-icon" title="แก้ไข" onclick="openWorklogModal('${w.log_id}')">✏️</button>
@@ -1204,10 +1249,13 @@
     // due_date แก้ไขได้เฉพาะตอนสร้างใหม่ — ตอนแก้ไขต้องผ่านปุ่มเลื่อนกำหนดเท่านั้น
     document.getElementById('wl-due-date-group').style.display = item ? 'none' : '';
     if (_fpDue) _fpDue.clear(); else document.getElementById('wl-due-date').value = '';
+    _wlApplyMinDate(_fpDue);
     document.getElementById('wl-reschedule-hint').style.display = item ? '' : 'none';
 
     document.getElementById('wl-status-group').style.display = item ? '' : 'none';
     if (item) document.getElementById('wl-status').value = item.status;
+    document.getElementById('wl-resolution-group').style.display = item ? '' : 'none';
+    document.getElementById('wl-resolution').value = item ? (item.resolution_note || '') : '';
 
     // [Feat 2026-09-24] ข้อ 3 (backlog รอบ 2): เวลาเริ่มงาน — แก้ไขได้เฉพาะ
     // IT_MANAGER และเฉพาะตอนแก้ไขงานที่มีอยู่แล้ว (งานใหม่ตั้งอัตโนมัติเสมอ)
@@ -1251,6 +1299,7 @@
           description: document.getElementById('wl-description').value,
           assigned_to: document.getElementById('wl-assigned-to').value,
           status: document.getElementById('wl-status').value,
+          resolution_note: document.getElementById('wl-resolution').value,
           linked_ticket_id: document.getElementById('wl-linked-ticket').value
         };
         // ข้อ 3 (backlog รอบ 2): ส่ง created_at ก็ต่อเมื่อเป็น IT_MANAGER และช่อง
@@ -1290,6 +1339,7 @@
     document.getElementById('wl-resched-title').textContent = item.title;
     document.getElementById('wl-resched-old-date').textContent = fmtWLDueDate(item.due_date);
     if (_fpResched) _fpResched.clear(); else document.getElementById('wl-resched-new-date').value = '';
+    _wlApplyMinDate(_fpResched);
     document.getElementById('wl-resched-reason').value = '';
 
     const histWrap = document.getElementById('wl-resched-history-wrap');
