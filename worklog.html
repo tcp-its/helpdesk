@@ -1131,7 +1131,9 @@
     // เรียงงานที่ยังไม่เสร็จและใกล้/เลยกำหนดไว้บนสุด (ภายในแต่ละเดือน)
     items = items.slice().sort((a,b) => {
       const order = { '🔴':0, '🟡':1, '🟢':2, '':3 };
-      return order[wlStatusColor(a)] - order[wlStatusColor(b)];
+      // [Change 2026-09-28] สีเท่ากัน → เรียงตามเลขงานจากใหม่ไปเก่า (WL-2026-0038 → 0037 → ...)
+      return (order[wlStatusColor(a)] - order[wlStatusColor(b)]) ||
+             String(b.log_no || '').localeCompare(String(a.log_no || ''));
     });
 
     const tbody = document.getElementById('worklog-tbody');
