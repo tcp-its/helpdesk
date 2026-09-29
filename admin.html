@@ -83,13 +83,30 @@
 
       <!-- ── USERS & ROLES ─────────────────────────────── -->
       <div id="section-users" class="section active">
-        <div class="d-flex justify-between align-center mb-16">
+        <div class="d-flex justify-between align-center mb-16" style="flex-wrap:wrap;gap:8px">
           <h3 class="fs-16">จัดการผู้ใช้งาน</h3>
-          <div class="d-flex gap-8">
-            <input type="text" class="form-control" id="user-search" placeholder="🔍 ค้นหา..." style="width:220px" oninput="filterUsers()">
+          <div class="d-flex gap-8" style="flex-wrap:wrap">
+            <select class="form-control" id="user-filter-dept" style="width:190px" onchange="filterUsers()"><option value="">ทุกแผนก</option></select>
+            <select class="form-control" id="user-filter-status" style="width:210px" onchange="filterUsers()">
+              <option value="">ทุกสถานะการลงทะเบียน</option>
+              <option value="complete">✅ ครบ (อีเมล + LINE)</option>
+              <option value="line_only">📱 มีแต่ LINE (ยังไม่มีอีเมล)</option>
+              <option value="email_only">🌐 มีแต่อีเมล (ยังไม่ผูก LINE)</option>
+              <option value="never_login">💤 ยังไม่เคยเข้าเว็บ</option>
+              <option value="issue">⚠️ ข้อมูลซ้ำ / รูปแบบผิด</option>
+              <option value="inactive">❌ Inactive</option>
+            </select>
+            <input type="text" class="form-control" id="user-search" placeholder="🔍 ชื่อ / อีเมล / ชื่อ LINE" style="width:220px" oninput="filterUsers()">
             <button class="btn btn-primary btn-sm" id="btn-register-user" style="display:none" onclick="openRegisterModal()">➕ ลงทะเบียน</button>
           </div>
         </div>
+        <!-- [Feat 2026-09-30] สรุปการลงทะเบียน + รายแผนก -->
+        <div id="user-summary-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px"></div>
+        <details class="card" id="user-dept-summary" style="margin-bottom:12px;padding:12px 16px">
+          <summary style="cursor:pointer;font-weight:600">📊 สรุปรายแผนก (กดเพื่อดู)</summary>
+          <div id="user-dept-table" style="margin-top:10px"></div>
+        </details>
+        <div class="text-muted fs-12" id="user-filter-count" style="margin-bottom:6px"></div>
         <div class="card">
           <div class="table-wrapper">
             <table>
@@ -503,33 +520,124 @@
   // ── USERS ───────────────────────────────────────────────────
   async function loadUsers() {
     const res = await API.get('users');
-    allUsers = res.success ? res.data : [];
-    renderUsers(allUsers);
+    // [Feat 2026-09-30] ตัดแถวว่าง (ไม่มีทั้งอีเมลและ LINE) ออก แล้ววิเคราะห์สถานะการลงทะเบียน
+    allUsers = (res.success ? res.data : []).filter(u => String(u.email || '').trim() || String(u.line_user_id || '').trim());
+    analyzeUsers(allUsers);
+    buildDeptFilter(allUsers);
+    renderUserSummary(allUsers);
+    filterUsers();
   }
+
+  // ── [Feat 2026-09-30] สถานะการลงทะเบียน / ข้อมูลซ้ำ / รูปแบบอีเมล ──
+  const USER_DOMAIN = '@tcpharmachem.com';
+  const REG_LABEL = {
+    complete:   '<span style="color:var(--secondary)">✅ ครบ</span>',
+    line_only:  '<span style="color:#b26a00">📱 มีแต่ LINE</span>',
+    email_only: '<span style="color:var(--primary)">🌐 ยังไม่ผูก LINE</span>'
+  };
+  function _normEmail(e) { return String(e || '').trim().toLowerCase(); }
+  function _isActive(u) { return String(u.is_active).toUpperCase() === 'TRUE'; }
+  function analyzeUsers(users) {
+    const byEmail = {}, byLine = {}, byName = {};
+    users.forEach(u => {
+      const e = _normEmail(u.email), l = String(u.line_user_id || '').trim();
+      if (e) (byEmail[e] = byEmail[e] || []).push(u);
+      if (l) (byLine[l] = byLine[l] || []).push(u);
+    });
+    users.forEach(u => {
+      const e = _normEmail(u.email), l = String(u.line_user_id || '').trim(), raw = String(u.email || '');
+      u._reg = e && l ? 'complete' : (l ? 'line_only' : 'email_only');
+      u._issues = [];
+      if (e && byEmail[e].length > 1) u._issues.push('อีเมลซ้ำ ' + byEmail[e].length + ' แถว');
+      if (l && byLine[l].length > 1) u._issues.push('LINE ซ้ำ ' + byLine[l].length + ' แถว');
+      if (raw && raw !== raw.trim()) u._issues.push('มีช่องว่าง');
+      if (raw && raw.trim() !== raw.trim().toLowerCase()) u._issues.push('มีตัวพิมพ์ใหญ่');
+      if (e && !e.endsWith(USER_DOMAIN)) u._issues.push('ไม่ใช่อีเมลบริษัท');
+    });
+    // อาจเป็นคนเดียวกัน 2 แถว: แถวที่มีแต่ LINE ชื่อ LINE ตรงกับชื่อของแถวที่มีแต่อีเมล
+    const emailOnlyByName = {};
+    users.filter(u => u._reg === 'email_only').forEach(u => {
+      const n = String(u.display_name || '').trim().toLowerCase(); if (n) emailOnlyByName[n] = u;
+    });
+    users.filter(u => u._reg === 'line_only').forEach(u => {
+      const n = String(u.line_display_name || u.display_name || '').trim().toLowerCase();
+      const m = n && emailOnlyByName[n];
+      if (m) { u._issues.push('อาจเป็นคนเดียวกับ ' + m.email); m._issues.push('อาจเป็นคนเดียวกับแถว LINE "' + (u.line_display_name || '') + '"'); }
+    });
+  }
+  function buildDeptFilter(users) {
+    const sel = document.getElementById('user-filter-dept');
+    const cur = sel.value;
+    const depts = [...new Set(users.map(u => String(u.department || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'th'));
+    sel.innerHTML = '<option value="">ทุกแผนก</option>' + depts.map(d => `<option value="${d}">${d}</option>`).join('') +
+      '<option value="__none__">— ไม่ระบุแผนก —</option>';
+    sel.value = cur;
+  }
+  function renderUserSummary(users) {
+    const act = users.filter(_isActive);
+    const cnt = k => act.filter(u => u._reg === k).length;
+    const issues = users.filter(u => u._issues.length).length;
+    const never = act.filter(u => u.email && !u.last_login).length;
+    const pct = act.length ? Math.round((act.filter(u => u.line_user_id).length / act.length) * 100) : 0;
+    const card = (label, val, color, filter) => `<div class="card" style="padding:10px 12px;margin:0;cursor:pointer" onclick="setUserStatusFilter('${filter}')">
+      <div style="font-size:22px;font-weight:800;color:${color}">${val}</div><div class="fs-12 text-muted">${label}</div></div>`;
+    document.getElementById('user-summary-cards').innerHTML =
+      card('ผู้ใช้ Active ทั้งหมด', act.length, 'var(--text)', '') +
+      card('ผูก LINE แล้ว', pct + '%', 'var(--secondary)', 'complete') +
+      card('📱 มีแต่ LINE', cnt('line_only'), '#b26a00', 'line_only') +
+      card('🌐 ยังไม่ผูก LINE', cnt('email_only'), 'var(--primary)', 'email_only') +
+      card('💤 ยังไม่เคยเข้าเว็บ', never, 'var(--text-muted)', 'never_login') +
+      card('⚠️ ข้อมูลซ้ำ/ผิดรูปแบบ', issues, issues ? 'var(--danger)' : 'var(--secondary)', 'issue');
+    const byDept = {};
+    act.forEach(u => { const d = String(u.department || '').trim() || '— ไม่ระบุแผนก —';
+      const r = byDept[d] = byDept[d] || { total: 0, line: 0, lineOnly: 0, emailOnly: 0 };
+      r.total++; if (u.line_user_id) r.line++; if (u._reg === 'line_only') r.lineOnly++; if (u._reg === 'email_only') r.emailOnly++; });
+    const rows = Object.entries(byDept).sort((a, b) => (a[1].line / a[1].total) - (b[1].line / b[1].total));
+    document.getElementById('user-dept-table').innerHTML = `<table style="width:100%;font-size:13px">
+      <tr><th style="text-align:left">แผนก</th><th>คน</th><th>ผูก LINE</th><th>%</th><th>มีแต่ LINE</th><th>ยังไม่ผูก LINE</th></tr>` +
+      rows.map(([d, r]) => { const p = Math.round(r.line / r.total * 100);
+        return `<tr style="cursor:pointer" onclick="setUserDeptFilter('${d === '— ไม่ระบุแผนก —' ? '__none__' : d}')"><td>${d}</td><td style="text-align:center">${r.total}</td><td style="text-align:center">${r.line}</td>
+        <td style="text-align:center;font-weight:700;color:${p >= 80 ? 'var(--secondary)' : p >= 50 ? 'var(--warning)' : 'var(--danger)'}">${p}%</td>
+        <td style="text-align:center">${r.lineOnly}</td><td style="text-align:center">${r.emailOnly}</td></tr>`; }).join('') +
+      '</table><div class="text-muted fs-11" style="margin-top:6px">เรียงจากแผนกที่ผูก LINE น้อยที่สุด · กดแถวเพื่อกรองตามแผนก</div>';
+  }
+  function setUserStatusFilter(v) { document.getElementById('user-filter-status').value = v; filterUsers(); }
+  function setUserDeptFilter(v) { document.getElementById('user-filter-dept').value = v; filterUsers(); }
 
   function renderUsers(users) {
     document.getElementById('users-tbody').innerHTML = users.map(u=>`
       <tr>
         <td><div class="fw-600">${u.display_name||'—'}</div><div class="text-muted fs-11">${u.line_display_name||''}</div></td>
-        <td class="fs-12">${u.email}</td>
+        <td class="fs-12">${u.email || '<span class="text-muted">— ยังไม่มีอีเมล —</span>'}<div class="fs-11">${REG_LABEL[u._reg] || ''}</div>${(u._issues||[]).map(i => `<div class="fs-11" style="color:var(--danger)">⚠️ ${i}</div>`).join('')}</td>
         <td><span class="role-badge role-${u.role}">${u.role||'USER'}</span></td>
         <td class="fs-12">${u.department||'—'}</td>
         <td class="fs-12">${u.line_user_id?'✅ เชื่อมต่อแล้ว':'<span class="text-muted">—</span>'}</td>
         <td class="fs-12 text-muted">${formatDate(u.last_login)}</td>
         <td><span style="color:${u.is_active==='TRUE'?'var(--secondary)':'var(--danger)'}">${u.is_active==='TRUE'?'✅ Active':'❌ Inactive'}</span></td>
         <td>
-          ${isManager()?`<button class="btn btn-secondary btn-sm" onclick="openEditUserModal('${u.email}')">✏️ แก้ไข</button>`:''}
+          ${isManager() && u.email ? `<button class="btn btn-secondary btn-sm" onclick="openEditUserModal('${u.email}')">✏️ แก้ไข</button>` : (isManager() ? '<span class="text-muted fs-11">ใส่อีเมลในชีตก่อน</span>' : '')}
         </td>
       </tr>`).join('') || '<tr><td colspan="8" class="text-center text-muted" style="padding:24px">ไม่มีผู้ใช้งาน</td></tr>';
   }
 
   function filterUsers() {
-    const kw = document.getElementById('user-search').value.toLowerCase();
-    renderUsers(allUsers.filter(u=>
-      (u.display_name||'').toLowerCase().includes(kw)||
-      (u.email||'').toLowerCase().includes(kw)||
-      (u.department||'').toLowerCase().includes(kw)
-    ));
+    const kw   = document.getElementById('user-search').value.toLowerCase().trim();
+    const dept = document.getElementById('user-filter-dept').value;
+    const st   = document.getElementById('user-filter-status').value;
+    const list = allUsers.filter(u => {
+      if (dept === '__none__' ? String(u.department || '').trim() : (dept && String(u.department || '').trim() !== dept)) return false;
+      if (st === 'inactive') { if (_isActive(u)) return false; }
+      else if (st) {
+        if (!_isActive(u)) return false;
+        if (st === 'never_login' && !(u.email && !u.last_login)) return false;
+        if (st === 'issue' && !(u._issues || []).length) return false;
+        if (['complete', 'line_only', 'email_only'].includes(st) && u._reg !== st) return false;
+      }
+      if (!kw) return true;
+      return [u.display_name, u.email, u.department, u.line_display_name].some(v => String(v || '').toLowerCase().includes(kw));
+    });
+    document.getElementById('user-filter-count').textContent = 'แสดง ' + list.length + ' จาก ' + allUsers.length + ' รายการ';
+    renderUsers(list);
   }
 
   function openEditUserModal(email) {
