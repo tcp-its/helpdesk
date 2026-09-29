@@ -216,7 +216,7 @@
             <div class="table-wrapper">
               <table>
                 <thead>
-                  <tr><th>เลขที่</th><th>ชื่องาน</th><th>หมวดหมู่</th><th>ผู้รับผิดชอบ</th><th>กำหนดส่ง</th><th>เลื่อนแล้ว</th><th>สถานะ</th><th>การดำเนินการ</th></tr>
+                  <tr><th style="white-space:nowrap">เลขที่</th><th>ชื่องาน</th><th>หมวดหมู่</th><th>ผู้รับผิดชอบ</th><th>กำหนดส่ง</th><th>เลื่อนแล้ว</th><th>สถานะ</th><th>การดำเนินการ</th></tr>
                 </thead>
                 <tbody id="worklog-tbody">
                   <tr><td colspan="8" class="text-center" style="padding:40px"><div class="spinner" style="margin:0 auto 16px"></div>กำลังโหลด...</td></tr>
@@ -1290,7 +1290,7 @@
     const canDelete = isManager();
     return `
       <tr class="${expanded ? '' : 'wl-month-item-hidden'}" data-month="${monthKey}">
-        <td class="fs-12 text-muted">${w.log_no||'—'}</td>
+        <td class="fs-12 text-muted" style="white-space:nowrap">${w.log_no||'—'}</td>
         <td><div class="fw-600 fs-13">${w.title}</div>${w.linked_ticket_id?`<div class="text-muted fs-11">🎫 ${w.linked_ticket_id}</div>`:''}${wlAttachmentCount(w)?`<div class="text-muted fs-11">📎 ${wlAttachmentCount(w)} ไฟล์</div>`:''}</td>
         <td class="fs-12">${w.category||'—'}</td>
         <td class="fs-12">${(wlUsers.find(u=>u.email===w.assigned_to)||{}).display_name || w.assigned_to || '—'}</td>
