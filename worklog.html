@@ -8,7 +8,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/main.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <style>
     /* ── หมวดหมู่งานภายใน (Print view สำหรับ Export PDF) — [Feat 2026-09-24] ──
        ซ่อนทุกอย่างยกเว้นตาราง WorkLog ตอนสั่งพิมพ์/บันทึกเป็น PDF ─────── */
@@ -46,6 +45,66 @@
     .wl-stat-card { flex:1; min-width:150px; background:var(--surface-alt); border-radius:8px; padding:12px 14px; }
     .wl-stat-card .wl-stat-value { font-size:22px; font-weight:800; line-height:1.2; }
     .wl-stat-card .wl-stat-label { font-size:11px; color:var(--text-muted); margin-top:2px; }
+    /* ── [Redesign 2026-09-29] Dashboard v2 ─────────────────────────── */
+    .wl-kpis { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:12px; }
+    .wl-kpi { margin:0 !important; padding:12px 14px !important; cursor:pointer; text-align:left; font:inherit; color:inherit; border:1px solid var(--border); width:100%; }
+    .wl-kpi:hover { border-color:var(--primary); }
+    .wl-kpi.on { outline:2px solid var(--primary); }
+    .wl-kpi-v { font-size:26px; font-weight:800; line-height:1.1; }
+    .wl-kpi-v small { font-size:13px; font-weight:600; margin-left:4px; }
+    .wl-kpi-l { font-size:13px; color:var(--text-secondary); margin-top:2px; }
+    .wl-kpi-s { font-size:11px; color:var(--text-muted); }
+    .wl-kpi-h { font-size:11px; color:var(--primary); margin-top:4px; }
+    .wl-drill { border:1px solid var(--primary) !important; }
+    .wl-drill table { width:100%; border-collapse:collapse; font-size:13px; }
+    .wl-drill td { padding:6px; border-top:1px solid var(--border); vertical-align:middle; }
+    .wl-grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+    .wl-grid3 > .card { margin:0; }
+    .wl-legend { display:flex; gap:12px; flex-wrap:wrap; font-size:11px; color:var(--text-secondary); margin:6px 0 8px; }
+    .wl-legend i { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:4px; vertical-align:-1px; }
+    .wl-hbar { display:grid; grid-template-columns:120px 1fr; align-items:center; gap:8px; margin:4px 0; padding:3px 2px; font-size:12px; cursor:pointer; border-radius:4px; }
+    .wl-hbar:hover { background:var(--surface-alt); }
+    .wl-hbar .nm { color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .wl-track { display:flex; align-items:center; gap:6px; min-width:0; }
+    .wl-stack { display:flex; gap:2px; height:14px; flex:none; }
+    .wl-stack span { display:block; height:100%; }
+    .wl-stack span:first-child { border-top-left-radius:4px; border-bottom-left-radius:4px; }
+    .wl-stack span:last-child { border-top-right-radius:4px; border-bottom-right-radius:4px; }
+    .wl-val { font-size:12px; font-weight:700; white-space:nowrap; }
+    .wl-val em { font-style:normal; font-weight:400; color:var(--text-muted); margin-left:4px; }
+    .wl-axis { position:relative; height:18px; margin-left:170px; font-size:10px; color:var(--text-muted); }
+    .wl-axis span { position:absolute; transform:translateX(-50%); }
+    .wl-prow { display:grid; grid-template-columns:170px 1fr; border-top:1px solid var(--border); padding:6px 0; }
+    .wl-pname { font-size:13px; font-weight:600; padding-right:8px; cursor:pointer; }
+    .wl-pname small { display:block; font-weight:400; color:var(--text-muted); font-size:11px; }
+    .wl-lane { position:relative; height:26px; }
+    .wl-lane-bg { position:absolute; inset:0; pointer-events:none; }
+    .wl-lane-bg .lunch { position:absolute; top:0; bottom:0; background:var(--surface-alt); }
+    .wl-lane-bg .gl { position:absolute; top:0; bottom:0; border-left:1px solid var(--border); }
+    .wl-task { position:absolute; top:3px; height:20px; border-radius:4px; background:#2a78d6; color:#fff; font-size:11px; padding:1px 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; box-shadow:0 0 0 2px var(--surface); }
+    .wl-task.ov { background:#eb6834; }
+    .wl-task.cont { background:#a9c6ef; color:#0b2a55; }
+    .wl-hand { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+    .wl-hand span { font-size:11px; border:1.5px dashed var(--text-muted); border-radius:10px; padding:1px 8px; color:var(--text-secondary); cursor:pointer; }
+    .wl-hand span.late { border-color:#d03b3b; color:#d03b3b; }
+    .wl-hand span.more { border-style:solid; color:var(--primary); border-color:var(--primary); }
+    .wl-week { width:100%; border-collapse:collapse; font-size:12px; table-layout:fixed; }
+    .wl-week th { font-size:11px; color:var(--text-muted); font-weight:600; padding:4px; border-bottom:1px solid var(--border); }
+    .wl-week th:first-child { width:170px; text-align:left; }
+    .wl-week td { border-top:1px solid var(--border); vertical-align:top; padding:6px 4px; }
+    .wl-chip { display:block; font-size:11px; border-radius:4px; padding:1px 6px; margin:2px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; background:#2a78d6; color:#fff; }
+    .wl-chip.h { background:none; border:1.5px dashed var(--text-muted); color:var(--text-secondary); cursor:default; }
+    .wl-cnt { font-size:11px; font-weight:700; color:var(--text-secondary); cursor:pointer; }
+    .wl-heat { display:block; text-align:center; border-radius:4px; font-weight:700; padding:4px 0; cursor:pointer; }
+    @media (max-width:900px) {
+      .wl-kpis { grid-template-columns:repeat(2,1fr); } .wl-grid3 { grid-template-columns:1fr; }
+      .wl-axis { margin-left:110px; } .wl-prow { grid-template-columns:110px 1fr; } .wl-week th:first-child { width:110px; }
+    }
+    @media print {
+      .wl-kpi-h, .wl-drill button { display:none !important; }
+      .wl-grid3 { grid-template-columns:repeat(3,1fr); }
+      .wl-week th:last-child, .wl-week td:last-child { display:table-cell !important; }
+    }
     /* ── Flatpickr Overrides (คัดลอกจาก analytics.html เพื่อความสม่ำเสมอ) ── */
     .flatpickr-input { cursor:pointer; }
     .flatpickr-months .flatpickr-month,
@@ -182,36 +241,43 @@
                 <button class="wl-period-btn" id="wl-period-btn-month" onclick="setWlPeriod('month')">เดือนนี้</button>
                 <button class="wl-period-btn" id="wl-period-btn-custom" onclick="setWlPeriod('custom')">กำหนดเอง</button>
                 <input type="text" class="form-control" id="wl-period-custom-range" style="width:220px;display:none" placeholder="เลือกช่วงวันที่">
+                <span class="fs-12 text-muted" id="wl-period-label"></span>
               </div>
               <button class="btn btn-secondary btn-sm" onclick="exportWorklogDashboardPDF()">🖨️ PDF Dashboard</button>
             </div>
           </div>
 
-          <div class="d-flex gap-12 mb-16" style="flex-wrap:wrap" id="wl-stat-cards"></div>
+          <div class="wl-kpis" id="wl-stat-cards"></div>
+          <div class="card mb-16 wl-drill" id="wl-drill" style="display:none"></div>
 
-          <div class="card mb-16" id="worklog-dashboard-card">
-            <div class="d-flex justify-between align-center mb-8" style="flex-wrap:wrap;gap:8px">
-              <h3 class="fs-14">📊 จำนวนงานต่อหมวดหมู่ (ทั้งหมด — ไม่กรองตามช่วงเวลา)</h3>
-              <span class="text-muted fs-12" id="wl-dash-highlight"></span>
+          <div class="card mb-16">
+            <h3 class="fs-14" id="wl-tl-title">🕘 ใครทำงานอะไร ช่วงเวลาไหน</h3>
+            <div class="text-muted fs-11" id="wl-tl-sub"></div>
+            <div id="wl-tl" style="margin-top:10px"></div>
+          </div>
+
+          <div class="wl-grid3">
+            <div class="card">
+              <h3 class="fs-14">📊 งานต่อหมวดหมู่</h3>
+              <div class="text-muted fs-11">หน่วย: งาน · ในช่วงที่เลือก · คลิกแถวเพื่อดูรายการ</div>
+              <div class="wl-legend"><span><i style="background:#0ca30c"></i>✅ เสร็จ</span><span><i style="background:#fab219"></i>⏳ ค้าง</span><span><i style="background:#d03b3b"></i>🔴 เลยกำหนด</span></div>
+              <div id="wl-c-cat"></div>
             </div>
-            <div id="worklog-category-chart" style="width:100%;height:260px"></div>
+            <div class="card">
+              <h3 class="fs-14">👥 ภาระงานต่อคน</h3>
+              <div class="text-muted fs-11">หน่วย: งาน · ในช่วงที่เลือก · คลิกแถวเพื่อดูรายการ</div>
+              <div class="wl-legend"><span><i style="background:#0ca30c"></i>✅ เสร็จ</span><span><i style="background:#fab219"></i>⏳ ค้าง</span><span><i style="background:#d03b3b"></i>🔴 เลยกำหนด</span></div>
+              <div id="wl-c-person"></div>
+            </div>
+            <div class="card">
+              <h3 class="fs-14">⏱️ เวลาปิดงานต่อหมวดหมู่</h3>
+              <div class="text-muted fs-11">หน่วย: วันทำงาน (ค่ากลาง) · เฉพาะงานที่เสร็จในช่วงนี้</div>
+              <div class="wl-legend"><span><i style="background:#2a78d6"></i>ค่ากลาง · n = จำนวนงานที่เสร็จ</span></div>
+              <div id="wl-c-dur"></div>
+            </div>
           </div>
+          <div class="text-muted fs-11 mt-8" id="wl-dash-foot"></div>
 
-          <div class="card mb-16">
-            <h3 class="fs-14 mb-8">👥 ภาระงานต่อคน (ในช่วงเวลาที่เลือก)</h3>
-            <div id="worklog-staff-chart" style="width:100%;height:260px"></div>
-          </div>
-
-          <div class="card mb-16">
-            <h3 class="fs-14 mb-8">⏱️ ระยะเวลาทำงานเฉลี่ยต่อหมวดหมู่ (ชั่วโมง — เฉพาะงานที่เสร็จแล้วในช่วงเวลาที่เลือก)</h3>
-            <div id="worklog-duration-chart" style="width:100%;height:260px"></div>
-          </div>
-
-          <div class="card">
-            <h3 class="fs-14 mb-8">📅 Timeline งานที่ทำพร้อมกันต่อคน (ในช่วงเวลาที่เลือก)</h3>
-            <div class="text-muted fs-11 mb-8">แท่งแสดงช่วงเวลา "เวลาเริ่มงาน" ถึง "เสร็จ/กำหนดส่ง" ของแต่ละงาน — แท่งที่ซ้อนทับกันในแถวเดียวกัน คืองานที่ทำพร้อมกันของคนคนนั้น</div>
-            <div id="worklog-timeline-chart" style="width:100%"></div>
-          </div>
         </div>
       </div>
 
@@ -456,15 +522,7 @@
     }
   }
 
-  // ── Google Charts (ข้อ 4 เดิม + ข้อ 2/7 backlog รอบ 2: Dashboard วิเคราะห์
-  // งานภายใน) — เพิ่ม package 'timeline' สำหรับ Timeline งานพร้อมกันต่อคน ──
-  let _wlChartsLoaded = false;
-  try {
-    google.charts.load('current', { packages: ['corechart', 'timeline'] });
-    google.charts.setOnLoadCallback(() => { _wlChartsLoaded = true; drawWorklogCategoryChart(); if (_wlDashboardTabActive) refreshWlDashboard(); });
-  } catch (gcErr) {
-    console.warn('[Google Charts] load failed:', gcErr);
-  }
+  // [Redesign 2026-09-29] Dashboard v2 ไม่ใช้ Google Charts แล้ว (กราฟเป็น HTML ทั้งหมด)
 
   // ── Flatpickr (วัน+เวลา) — [Feat 2026-09-23] แทนที่ช่องกรอกวันที่แบบ
   // พิมพ์เอง DD/MM/YYYY เดิม ด้วยตัวเลือกวันและเวลาจริง ──
@@ -596,48 +654,6 @@
     if (wlCategories.includes(curEdit))   editSel.value   = curEdit;
   }
 
-  // ข้อ 4: จำนวนงานต่อหมวดหมู่ — นับ (ไม่ใช่ชั่วโมงจริง เพราะไม่มีฟิลด์เก็บเวลา)
-  // แสดงตัวเลขกำกับทุกแท่ง (annotation) เสมอ ตามกฎ dataviz: ผลตรวจสี
-  // (validator) เตือนเรื่องคอนทราสต์ของบางสีบนพื้นสว่าง — ต้องมี label
-  // ให้เห็นชัดเจน ไม่พึ่งสีอย่างเดียว
-  function drawWorklogCategoryChart() {
-    if (!_wlChartsLoaded || typeof google === 'undefined' || !google.visualization) return;
-    const el = document.getElementById('worklog-category-chart');
-    if (!el) return;
-    const cats = wlCategories.length ? wlCategories : Array.from(new Set(allWorklog.map(w => w.category).filter(Boolean)));
-    if (!cats.length) { el.innerHTML = '<div class="empty-state fs-12">ยังไม่มีข้อมูล</div>'; document.getElementById('wl-dash-highlight').textContent=''; return; }
-
-    const counts = {};
-    cats.forEach(c => counts[c] = 0);
-    allWorklog.forEach(w => { if (w.category) counts[w.category] = (counts[w.category]||0) + 1; });
-
-    const dt = new google.visualization.DataTable();
-    dt.addColumn('string', 'หมวดหมู่');
-    cats.forEach(c => { dt.addColumn('number', c); dt.addColumn({ type:'number', role:'annotation' }); });
-    const row = ['จำนวนงาน'];
-    cats.forEach(c => { row.push(counts[c]||0); row.push(counts[c]||0); });
-    dt.addRow(row);
-
-    const seriesOpt = {};
-    cats.forEach((c, i) => { seriesOpt[i] = { color: wlColorForCategory(c) }; });
-
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    new google.visualization.ColumnChart(el).draw(dt, {
-      legend: { position: 'bottom', textStyle: { fontSize:11, color: isDark?'#aaa':'#666' } },
-      series: seriesOpt,
-      backgroundColor: 'transparent',
-      hAxis: { textStyle: { fontSize:0 } },
-      vAxis: { minValue:0, gridlines:{color:isDark?'#333':'#f0f0f0'}, textStyle:{fontSize:10,color:isDark?'#aaa':'#666'} },
-      chartArea: { left:36, right:16, top:16, bottom:48 },
-      annotations: { alwaysOutside:false, textStyle:{fontSize:12, color:isDark?'#eee':'#222', bold:true} }
-    });
-
-    let topCat = '', topN = -1;
-    cats.forEach(c => { if ((counts[c]||0) > topN) { topN = counts[c]||0; topCat = c; } });
-    document.getElementById('wl-dash-highlight').textContent = topN > 0
-      ? `หมวดที่มีงานมากที่สุด: ${topCat} (${topN} งาน)` : '';
-  }
-
   // ══════════════════════════════════════════════════════════════
   // ── ข้อ 1/2/5/7 (backlog รอบ 2): แท็บ Dashboard — ตัวกรองช่วงเวลา,
   // ภาระงานต่อคน, ระยะเวลาเฉลี่ยต่อหมวดหมู่, Timeline งานพร้อมกันต่อคน,
@@ -713,7 +729,12 @@
     const start = _wlParseDT(w.created_at) || _wlParseDT(w.due_date) || new Date();
     let end;
     if (w.status === '✅ เสร็จแล้ว' && w.done_at) end = _wlParseDT(w.done_at) || new Date();
-    else end = _wlParseDT(w.due_date) || new Date();
+    else {
+      // [Redesign 2026-09-29] งานที่ยังไม่เสร็จ ถือว่ายัง "อยู่" จนถึงตอนนี้ แม้เลยกำหนดส่งแล้ว
+      // (เดิมตัดที่กำหนดส่ง ทำให้งานเลยกำหนดหายจาก "วันนี้"/"สัปดาห์นี้")
+      const due = _wlParseDT(w.due_date), now = new Date();
+      end = (due && due > now) ? due : now;
+    }
     if (end < start) end = start; // กันข้อมูลเพี้ยน เช่น กำหนดส่งเก่ากว่าเวลาเริ่มงาน
     return { start, end };
   }
@@ -726,166 +747,332 @@
     });
   }
 
-  function refreshWlDashboard() {
-    if (!wlPeriod.start) { setWlPeriod('week'); return; } // setWlPeriod จะเรียก refresh ต่อเองอยู่แล้ว
-    drawWorklogCategoryChart();
-    renderWlStatCards();
-    drawWorklogStaffChart();
-    drawWorklogDurationChart();
-    drawWorklogTimelineChart();
+  // ══════════════════════════════════════════════════════════════
+  // [Redesign 2026-09-29] Dashboard v2 — การ์ดตัวเลขคลิกดูรายการได้, กราฟแท่ง
+  // HTML พร้อมตัวเลข+หน่วย, มุมมอง "วันนี้" (08:30–17:30) / "รายวันในช่วง",
+  // เวลาปิดงานเป็น "วันทำงาน" (ค่ากลาง) — ไม่ใช้ Google Charts แล้ว
+  // (เดิม 294.3 = ชั่วโมงตามปฏิทิน 24 ชม. รวมกลางคืน/เสาร์–อาทิตย์)
+  // ══════════════════════════════════════════════════════════════
+  const WL_DONE = '✅ เสร็จแล้ว';
+  const WL_C = { good:'#0ca30c', warn:'#fab219', crit:'#d03b3b', s1:'#2a78d6', ov:'#eb6834' };
+  const WL_W0 = 510, WL_L0 = 720, WL_L1 = 780, WL_W1 = 1050; // 08:30 / 12:00 / 13:00 / 17:30 (นาทีของวัน)
+  const WL_DAY_MIN = 480; // 1 วันทำงาน = 8 ชม.
+  const WL_TH_DOW = ['อา','จ','อ','พ','พฤ','ศ','ส'];
+  let wlHolidaySet = null, wlHolidayOk = false, _wlHolidayLoading = null;
+  let _wlDrillKey = null;
+  const _wlKeys = [];
+  function _wlK(k) { let i = _wlKeys.indexOf(k); if (i < 0) { _wlKeys.push(k); i = _wlKeys.length - 1; } return i; }
+
+  // วันหยุดบริษัท — ใช้ endpoint 'holidays' ถ้ามี (ยังไม่มี = หักแค่เสาร์–อาทิตย์)
+  function loadWlHolidays() {
+    if (_wlHolidayLoading) return _wlHolidayLoading;
+    _wlHolidayLoading = (async () => {
+      const set = new Set();
+      try {
+        const res = await API.get('holidays');
+        if (res.success && Array.isArray(res.data)) {
+          res.data.filter(h => h.is_active === undefined || String(h.is_active).toUpperCase() === 'TRUE')
+            .forEach(h => { const s = _wlToBkkStr(h.holiday_date).substring(0, 10); if (/^\d{4}-\d{2}-\d{2}$/.test(s)) set.add(s); });
+          wlHolidayOk = true;
+        }
+      } catch (e) { console.warn('[WL holidays]', e); }
+      wlHolidaySet = set;
+    })();
+    return _wlHolidayLoading;
   }
 
-  // ── การ์ดสถิติ (ข้อ 7: ภาระงาน/เลื่อนบ่อย/ทำพร้อมกันสูงสุด) ──────────
+  function _wlDT(raw) { return raw ? _wlParseDT(_wlToBkkStr(raw)) : null; }
+  function _wlYmd(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+  function _wlDM(d) { return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0'); }
+  function _wlHM(m) { m = Math.round(m); return String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0'); }
+  function _wlMinOfDay(d) { return d.getHours()*60 + d.getMinutes(); }
+  function _wlIsWorkDay(d) { const g = d.getDay(); return g !== 0 && g !== 6 && !(wlHolidaySet && wlHolidaySet.has(_wlYmd(d))); }
+  function _wlWorkMinutes(a, b) {
+    if (!a || !b || b <= a) return 0;
+    let total = 0;
+    const day = _wlStartOfDay(a);
+    for (let g = 0; day <= b && g < 1000; g++, day.setDate(day.getDate() + 1)) {
+      if (!_wlIsWorkDay(day)) continue;
+      const base = day.getTime();
+      [[WL_W0, WL_L0], [WL_L1, WL_W1]].forEach(([s, e]) => {
+        const s1 = Math.max(base + s*60000, a.getTime()), e1 = Math.min(base + e*60000, b.getTime());
+        if (e1 > s1) total += (e1 - s1) / 60000;
+      });
+    }
+    return total;
+  }
+  function _wlMedian(arr) {
+    if (!arr.length) return null;
+    const s = arr.slice().sort((a,b) => a-b), m = Math.floor(s.length/2);
+    return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2;
+  }
+  function _wlFmtDays(v) { if (v == null) return '—'; if (v > 0 && v < 0.05) return '<0.1'; return (Math.round(v*10)/10).toFixed(1); }
+  function _wlPerson(w) { return (wlUsers.find(u => u.email === w.assigned_to) || {}).display_name || w.assigned_to || '(ไม่ระบุ)'; }
+  function _wlDoneAt(w) { return w.status === WL_DONE ? (_wlDT(w.done_at) || _wlDT(w.due_date)) : null; }
+  // งานที่ "บันทึกย้อนหลัง" (เวลาเริ่ม→เสร็จ ห่างกันไม่ถึง 6 นาที) ไม่ใช่เวลาทำงานจริง — ไม่นับในเวลาปิดงาน
+  function _wlIsRetro(w) { const s = _wlDT(w.created_at), e = _wlDoneAt(w); return !!(s && e && (e - s) < 6*60000); }
+  function _wlCloseDays(w) { const s = _wlDT(w.created_at), e = _wlDoneAt(w); return (s && e && !_wlIsRetro(w)) ? _wlWorkMinutes(s, e) / WL_DAY_MIN : null; }
+  function _wlIsLateNow(w) { return w.status !== WL_DONE && wlStatusColor(w) === '🔴'; }
+
+  // ชุดข้อมูลของช่วงเวลาที่เลือก: ทั้งหมด = เสร็จในช่วง + ค้าง ณ สิ้นช่วง; เลยกำหนด ⊂ ค้าง
+  function _wlDashSets() {
+    const items = _wlItemsInPeriod(), done = [], open = [];
+    items.forEach(w => { const d = _wlDoneAt(w); (d && d >= wlPeriod.start && d <= wlPeriod.end ? done : open).push(w); });
+    const late = open.filter(_wlIsLateNow);
+    const days = done.map(_wlCloseDays).filter(v => v !== null);
+    const retro = done.filter(_wlIsRetro).length;
+    return { items, done, open, late, days, retro };
+  }
+
   function renderWlStatCards() {
     const wrap = document.getElementById('wl-stat-cards');
-    if (!wrap) return;
-    const items = _wlItemsInPeriod();
-
-    const overdueCount     = items.filter(w => wlStatusColor(w) === '🔴').length;
-    const frequentReschedCount = items.filter(w => (w.reschedule_count||0) >= 3).length;
-    const peak = _wlPeakConcurrency(items);
-
-    wrap.innerHTML = `
-      <div class="wl-stat-card"><div class="wl-stat-value">${items.length}</div><div class="wl-stat-label">งานในช่วงเวลานี้</div></div>
-      <div class="wl-stat-card"><div class="wl-stat-value" style="color:#c62828">${overdueCount}</div><div class="wl-stat-label">🔴 เลยกำหนด</div></div>
-      <div class="wl-stat-card"><div class="wl-stat-value" style="color:#e65100">${frequentReschedCount}</div><div class="wl-stat-label">เลื่อนกำหนด ≥3 ครั้ง</div></div>
-      <div class="wl-stat-card"><div class="wl-stat-value">${peak.max}</div><div class="wl-stat-label">งานพร้อมกันสูงสุด${peak.person ? ' — ' + _wlEscapeHtml(peak.person) : ''}</div></div>
-    `;
+    if (!wrap || !wlPeriod.start) return;
+    const S = _wlDashSets();
+    const med = _wlMedian(S.days), avg = S.days.length ? S.days.reduce((a,b) => a+b, 0) / S.days.length : null;
+    const card = (key, val, unit, label, color, sub) => `
+      <button type="button" class="card wl-kpi${_wlDrillKey === key ? ' on' : ''}" onclick="wlDrill(${_wlK(key)})">
+        <div class="wl-kpi-v" style="color:${color}">${val}<small>${unit}</small></div>
+        <div class="wl-kpi-l">${label}</div>${sub ? `<div class="wl-kpi-s">${sub}</div>` : ''}
+        <div class="wl-kpi-h">คลิกเพื่อดูรายละเอียด ▾</div>
+      </button>`;
+    wrap.innerHTML =
+      card('all',  S.items.length, ' งาน', 'งานในช่วงนี้', 'inherit') +
+      card('done', S.done.length,  ' งาน', '✅ เสร็จในช่วงนี้', WL_C.good) +
+      card('open', S.open.length,  ' งาน', '⏳ ยังค้าง (ณ สิ้นช่วง)', '#b27a00') +
+      card('late', S.late.length,  ' งาน', '🔴 เลยกำหนด', WL_C.crit) +
+      card('dur',  _wlFmtDays(med), med == null ? '' : ' วันทำงาน', '⏱️ เวลาปิดงาน (ค่ากลาง)', 'inherit',
+           (avg == null ? 'ยังไม่มีงานที่เสร็จในช่วงนี้' : 'เฉลี่ย ' + _wlFmtDays(avg) + ' วัน · n=' + S.days.length + ' งาน') +
+           (S.retro ? '<br>ไม่นับ ' + S.retro + ' งานที่บันทึกย้อนหลัง' : ''));
   }
 
-  // หา "จำนวนงานที่ซ้อนทับกันในเวลาเดียวกันมากที่สุด" ต่อคน แบบ sweep-line
-  // (นับทีละคน แล้วเทียบหาค่ามากสุดรวม) — ใช้ _wlItemSpan() ตัวเดียวกับ Timeline
-  function _wlPeakConcurrency(items) {
-    const byPerson = {};
-    items.forEach(w => { const p = w.assigned_to || '(ไม่ระบุ)'; (byPerson[p] = byPerson[p] || []).push(w); });
-
-    let best = { max: 0, person: '' };
-    Object.keys(byPerson).forEach(person => {
-      const events = [];
-      byPerson[person].forEach(w => {
-        const { start, end } = _wlItemSpan(w);
-        events.push([start.getTime(), 1], [end.getTime(), -1]);
-      });
-      events.sort((a,b) => a[0] - b[0] || a[1] - b[1]);
-      let cur = 0, max = 0;
-      events.forEach(e => { cur += e[1]; if (cur > max) max = cur; });
-      if (max > best.max) best = { max, person: (wlUsers.find(u=>u.email===person)||{}).display_name || person };
-    });
-    return best;
+  // ── รายการงานเมื่อคลิกการ์ด / แถวกราฟ / ช่องวัน ──
+  function _wlDrillDef(key) {
+    const S = _wlDashSets();
+    if (key === 'all')  return ['งานในช่วงนี้', S.items];
+    if (key === 'done') return ['✅ เสร็จในช่วงนี้', S.done];
+    if (key === 'open') return ['⏳ ยังค้าง (ณ สิ้นช่วง)', S.open];
+    if (key === 'late') return ['🔴 เลยกำหนด', S.late];
+    if (key === 'dur')  return ['⏱️ งานที่เสร็จในช่วงนี้ — เรียงจากใช้เวลานานสุด', S.done.slice().sort((a,b) => (_wlCloseDays(b)||0) - (_wlCloseDays(a)||0))];
+    const i = key.indexOf(':'), type = key.slice(0, i), val = key.slice(i + 1);
+    if (type === 'p') return ['👤 ' + val + ' — งานในช่วงนี้', S.items.filter(w => _wlPerson(w) === val)];
+    if (type === 'c') return ['📊 ' + val + ' — งานในช่วงนี้', S.items.filter(w => (w.category || 'อื่นๆ') === val)];
+    if (type === 'pd') {
+      const [p, ymd] = val.split('|');
+      const [y, m, d] = ymd.split('-');
+      return ['👤 ' + p + ' — งานที่เสร็จวันที่ ' + d + '/' + m + '/' + y,
+        S.items.filter(w => _wlPerson(w) === p && _wlDoneAt(w) && _wlYmd(_wlDoneAt(w)) === ymd)];
+    }
+    return ['', []];
   }
 
-  // ── ภาระงานต่อคน (เสร็จ vs ค้างอยู่ ในช่วงเวลาที่เลือก) ──────────────
+  function wlDrill(idx) {
+    const key = _wlKeys[idx];
+    _wlDrillKey = (_wlDrillKey === key) ? null : key;
+    renderWlDrill();
+    renderWlStatCards();
+    if (_wlDrillKey) document.getElementById('wl-drill').scrollIntoView({ behavior:'smooth', block:'nearest' });
+  }
+
+  function renderWlDrill() {
+    const el = document.getElementById('wl-drill');
+    if (!el) return;
+    if (!_wlDrillKey) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    const [title, list] = _wlDrillDef(_wlDrillKey);
+    const rows = list.slice().sort((a,b) => (_wlIsLateNow(b) - _wlIsLateNow(a)) || String(a.due_date||'').localeCompare(String(b.due_date||'')));
+    el.style.display = '';
+    el.innerHTML = `
+      <div class="d-flex justify-between align-center mb-8">
+        <h3 class="fs-14">${_wlEscapeHtml(title)} — ${rows.length} รายการ</h3>
+        <button class="btn btn-secondary btn-sm" onclick="wlDrill(${_wlK(_wlDrillKey)})">✕ ปิด</button>
+      </div>
+      ${rows.length ? `<table>${rows.map(w => {
+        const d = _wlDoneAt(w), cd = _wlCloseDays(w);
+        const st = w.status === WL_DONE ? '<span style="color:' + WL_C.good + '">✅ เสร็จ ' + fmtWLDueDate(_wlToBkkStr(w.done_at || w.due_date)) + '</span>'
+          : (_wlIsLateNow(w) ? '<span style="color:' + WL_C.crit + '">🔴 เลยกำหนด ' : '<span>⏳ ส่ง ') + fmtWLDueDate(_wlToBkkStr(w.due_date)) + '</span>';
+        return `<tr>
+          <td class="fs-12 text-muted" style="white-space:nowrap">${_wlEscapeHtml(w.log_no || '')}</td>
+          <td>${_wlEscapeHtml(w.title)}</td>
+          <td class="fs-12">${_wlEscapeHtml(_wlPerson(w))}</td>
+          <td class="fs-12">${_wlEscapeHtml(w.category || '')}</td>
+          <td class="fs-12" style="white-space:nowrap">${st}</td>
+          <td class="fs-12 text-muted" style="white-space:nowrap">${d && cd != null ? 'ใช้ ' + _wlFmtDays(cd) + ' วันทำงาน' : (d && _wlIsRetro(w) ? 'บันทึกย้อนหลัง (ไม่นับเวลา)' : '')}</td>
+          <td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" onclick="openWorklogModal('${_wlEscapeHtml(w.log_id)}')">เปิดดู ›</button></td>
+        </tr>`; }).join('')}</table>` : '<div class="empty-state fs-12">ไม่มีรายการ</div>'}`;
+  }
+
+  // ── กราฟแท่งแนวนอน (HTML) — แท่งซ้อน เสร็จ / ค้าง / เลยกำหนด พร้อมตัวเลข+หน่วย ──
+  function _wlStackChart(elId, groups) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    if (!groups.length) { el.innerHTML = '<div class="empty-state fs-12">ไม่มีงานในช่วงเวลานี้</div>'; return; }
+    const max = Math.max(...groups.map(g => g.done + g.open + g.late), 1);
+    el.innerHTML = groups.map(g => {
+      const tot = g.done + g.open + g.late;
+      const segs = [[g.done, WL_C.good, 'เสร็จ'], [g.open, WL_C.warn, 'ค้าง'], [g.late, WL_C.crit, 'เลยกำหนด']].filter(s => s[0] > 0)
+        .map(s => `<span style="flex:${s[0]};background:${s[1]}" title="${_wlEscapeHtml(g.label)} · ${s[2]} ${s[0]} งาน"></span>`).join('');
+      return `<div class="wl-hbar" onclick="wlDrill(${_wlK(g.key)})" title="คลิกเพื่อดูรายการ">
+        <span class="nm" title="${_wlEscapeHtml(g.label)}">${_wlEscapeHtml(g.label)}</span>
+        <span class="wl-track"><span class="wl-stack" style="width:${(tot/max*72).toFixed(1)}%">${segs}</span>
+        <span class="wl-val">${tot} งาน${g.late ? `<em style="color:${WL_C.crit}">🔴 ${g.late}</em>` : ''}</span></span></div>`;
+    }).join('');
+  }
+
+  function _wlGroupBy(fnLabel, keyPrefix) {
+    const S = _wlDashSets(), m = {};
+    const add = (w, k) => { const l = fnLabel(w); (m[l] = m[l] || { label:l, key:keyPrefix + l, done:0, open:0, late:0 })[k]++; };
+    S.done.forEach(w => add(w, 'done'));
+    S.open.forEach(w => add(w, _wlIsLateNow(w) ? 'late' : 'open'));
+    return Object.values(m).sort((a,b) => (b.done+b.open+b.late) - (a.done+a.open+a.late));
+  }
+
+  function drawWorklogCategoryChart() {
+    if (!wlPeriod.start || !document.getElementById('wl-c-cat')) return;
+    _wlStackChart('wl-c-cat', _wlGroupBy(w => w.category || 'อื่นๆ', 'c:'));
+  }
+
   function drawWorklogStaffChart() {
-    if (!_wlChartsLoaded || typeof google === 'undefined' || !google.visualization) return;
-    const el = document.getElementById('worklog-staff-chart');
-    if (!el) return;
-    const items = _wlItemsInPeriod();
-    if (!items.length) { el.innerHTML = '<div class="empty-state fs-12">ไม่มีงานในช่วงเวลานี้</div>'; return; }
-
-    const byPerson = {};
-    items.forEach(w => {
-      const p = (wlUsers.find(u=>u.email===w.assigned_to)||{}).display_name || w.assigned_to || '(ไม่ระบุ)';
-      if (!byPerson[p]) byPerson[p] = { done: 0, open: 0 };
-      byPerson[p][w.status === '✅ เสร็จแล้ว' ? 'done' : 'open']++;
-    });
-    const people = Object.keys(byPerson).sort((a,b) => (byPerson[b].done+byPerson[b].open) - (byPerson[a].done+byPerson[a].open));
-
-    const dt = new google.visualization.DataTable();
-    dt.addColumn('string', 'คน');
-    dt.addColumn('number', 'เสร็จแล้ว');
-    dt.addColumn('number', 'ยังไม่เสร็จ');
-    people.forEach(p => dt.addRow([p, byPerson[p].done, byPerson[p].open]));
-
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    new google.visualization.BarChart(el).draw(dt, {
-      isStacked: true,
-      legend: { position: 'top', textStyle: { fontSize:11, color: isDark?'#aaa':'#666' } },
-      colors: ['#1baf7a', '#eda100'],
-      backgroundColor: 'transparent',
-      hAxis: { minValue:0, gridlines:{color:isDark?'#333':'#f0f0f0'}, textStyle:{fontSize:10,color:isDark?'#aaa':'#666'} },
-      vAxis: { textStyle: { fontSize:11, color: isDark?'#ddd':'#333' } },
-      chartArea: { left:120, right:24, top:24, bottom:32 }
-    });
+    if (!wlPeriod.start) return;
+    _wlStackChart('wl-c-person', _wlGroupBy(_wlPerson, 'p:'));
   }
 
-  // ── ระยะเวลาทำงานเฉลี่ยต่อหมวดหมู่ (เฉพาะงานที่เสร็จแล้วในช่วงเวลาที่เลือก) ──
   function drawWorklogDurationChart() {
-    if (!_wlChartsLoaded || typeof google === 'undefined' || !google.visualization) return;
-    const el = document.getElementById('worklog-duration-chart');
-    if (!el) return;
-    const doneItems = _wlItemsInPeriod().filter(w => w.status === '✅ เสร็จแล้ว' && w.done_at && w.created_at);
-    if (!doneItems.length) { el.innerHTML = '<div class="empty-state fs-12">ยังไม่มีงานที่เสร็จแล้วในช่วงเวลานี้</div>'; return; }
-
-    const byCategory = {};
-    doneItems.forEach(w => {
-      const start = _wlParseDT(w.created_at), end = _wlParseDT(w.done_at);
-      if (!start || !end) return;
-      const hours = Math.max(0, (end - start) / 3600000);
-      const cat = w.category || 'อื่นๆ';
-      (byCategory[cat] = byCategory[cat] || []).push(hours);
-    });
-    const cats = Object.keys(byCategory);
-    if (!cats.length) { el.innerHTML = '<div class="empty-state fs-12">ยังไม่มีข้อมูล</div>'; return; }
-
-    const dt = new google.visualization.DataTable();
-    dt.addColumn('string', 'หมวดหมู่');
-    dt.addColumn('number', 'ชั่วโมงเฉลี่ย');
-    dt.addColumn({ type:'number', role:'annotation' });
-    cats.forEach(c => {
-      const arr = byCategory[c];
-      const avg = Math.round((arr.reduce((a,b)=>a+b,0) / arr.length) * 10) / 10;
-      dt.addRow([c, avg, avg]);
-    });
-
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    new google.visualization.BarChart(el).draw(dt, {
-      legend: { position: 'none' },
-      colors: [WL_CATEGORY_COLORS[0]],
-      backgroundColor: 'transparent',
-      hAxis: { minValue:0, title:'ชั่วโมง', gridlines:{color:isDark?'#333':'#f0f0f0'}, textStyle:{fontSize:10,color:isDark?'#aaa':'#666'} },
-      vAxis: { textStyle: { fontSize:11, color: isDark?'#ddd':'#333' } },
-      chartArea: { left:120, right:40, top:16, bottom:32 },
-      annotations: { textStyle:{fontSize:11, color:isDark?'#eee':'#222', bold:true} }
-    });
+    const el = document.getElementById('wl-c-dur');
+    if (!el || !wlPeriod.start) return;
+    const S = _wlDashSets(), m = {};
+    S.done.forEach(w => { const v = _wlCloseDays(w); if (v == null) return; const c = w.category || 'อื่นๆ'; (m[c] = m[c] || []).push(v); });
+    const rows = Object.keys(m).map(c => ({ c, med:_wlMedian(m[c]), n:m[c].length })).sort((a,b) => b.med - a.med);
+    const retroNote = S.retro ? `<div class="text-muted fs-11 mt-8">ไม่นับ ${S.retro} งานที่บันทึกย้อนหลัง (เวลาเริ่ม→เสร็จ ไม่ถึง 6 นาที)</div>` : '';
+    if (!rows.length) { el.innerHTML = '<div class="empty-state fs-12">ยังไม่มีงานที่เสร็จในช่วงนี้</div>' + retroNote; return; }
+    const max = Math.max(...rows.map(r => r.med), 0.1);
+    el.innerHTML = rows.map(r => `<div class="wl-hbar" onclick="wlDrill(${_wlK('c:' + r.c)})" title="คลิกเพื่อดูรายการ">
+      <span class="nm" title="${_wlEscapeHtml(r.c)}">${_wlEscapeHtml(r.c)}</span>
+      <span class="wl-track"><span class="wl-stack" style="width:${Math.max(1, r.med/max*48).toFixed(1)}%"><span style="flex:1;background:${WL_C.s1}" title="${_wlEscapeHtml(r.c)} · ค่ากลาง ${_wlFmtDays(r.med)} วันทำงาน (n=${r.n})"></span></span>
+      <span class="wl-val">${_wlFmtDays(r.med)} วัน<em>n=${r.n}</em></span></span></div>`).join('') + retroNote;
   }
 
-  // ── Timeline งานที่ทำพร้อมกันต่อคน (ข้อ 2 backlog รอบ 2) ─────────────
-  // ใช้ google.visualization.Timeline — แถว = คน, แท่ง = งาน 1 ชิ้น ช่วง
-  // "เวลาเริ่มงาน" (created_at) ถึง "เสร็จ/กำหนดส่ง/ปัจจุบัน" (ดู _wlItemSpan())
-  // แท่งที่ซ้อนกันในแถวเดียวกัน = งานที่คนคนนั้นทำพร้อมกันจริง
+  // ── มุมมองเวลา: 1 วัน = แกน 08:30–17:30 / หลายวัน = ตาราง คน × วัน ──
   function drawWorklogTimelineChart() {
-    if (!_wlChartsLoaded || typeof google === 'undefined' || !google.visualization || !google.visualization.Timeline) return;
-    const el = document.getElementById('worklog-timeline-chart');
-    if (!el) return;
-    const items = _wlItemsInPeriod();
-    if (!items.length) { el.innerHTML = '<div class="empty-state fs-12">ไม่มีงานในช่วงเวลานี้</div>'; el.style.height = '80px'; return; }
+    const el = document.getElementById('wl-tl');
+    if (!el || !wlPeriod.start) return;
+    const oneDay = _wlYmd(wlPeriod.start) === _wlYmd(wlPeriod.end);
+    const today = _wlYmd(new Date()) === _wlYmd(wlPeriod.start);
+    document.getElementById('wl-tl-title').textContent = oneDay
+      ? (today ? '🕘 วันนี้ ใครทำงานอะไร ช่วงเวลาไหน' : '🕘 วันที่ ' + fmtWLDueDate(_wlYmd(wlPeriod.start)) + ' ใครทำงานอะไร ช่วงเวลาไหน')
+      : '📅 ใครทำงานอะไร วันไหน (เฉพาะวันในช่วงที่เลือก)';
+    document.getElementById('wl-tl-sub').innerHTML = oneDay
+      ? 'เวลาทำงาน 08:30–17:30 (แถบเทา = พักเที่ยง) · <b style="color:' + WL_C.s1 + '">แท่งน้ำเงิน</b> = งานที่เสร็จวันนี้ (เวลาเริ่ม→เสร็จ) · <b style="color:' + WL_C.ov + '">แท่งส้ม</b> = ช่วงที่ทำซ้อนกัน · <b style="color:#7fa9e6">แท่งสีจาง ◀</b> = เริ่มก่อนวันนี้ (ไม่รู้เวลาทำจริง ไม่นับว่าซ้อน) · เส้นประ = งานในมือ (ยังไม่มีเวลาทำจริง — ปุ่ม ▶️/⏸️ จะมาในขั้นที่ 2)'
+      : 'แท่งน้ำเงิน = งานที่เสร็จในวันนั้น · เส้นประ = งานในมือวันนี้ · คลิกงานเพื่อเปิดดู';
+    if (oneDay) _wlDrawDay(el, wlPeriod.start); else _wlDrawRange(el);
+  }
 
-    const dt = new google.visualization.DataTable();
-    dt.addColumn({ type: 'string', id: 'คน' });
-    dt.addColumn({ type: 'string', id: 'งาน' });
-    dt.addColumn({ type: 'string', role: 'tooltip' });
-    dt.addColumn({ type: 'date', id: 'เริ่ม' });
-    dt.addColumn({ type: 'date', id: 'สิ้นสุด' });
-
-    const rows = items.map(w => {
-      const { start, end } = _wlItemSpan(w);
-      const person = (wlUsers.find(u=>u.email===w.assigned_to)||{}).display_name || w.assigned_to || '(ไม่ระบุ)';
-      const tooltip = `${w.title}\n${w.category||''}\n${fmtWLDueDate(w.created_at)} → ${w.status==='✅ เสร็จแล้ว'?'เสร็จ':'กำหนดส่ง'} ${fmtWLDueDate(w.status==='✅ เสร็จแล้ว'?w.done_at:w.due_date)}`;
-      return [person, w.title, tooltip, start, end];
+  function _wlDrawDay(el, day) {
+    const d0 = _wlStartOfDay(day), d1 = _wlEndOfDay(day);
+    const pct = m => ((m - WL_W0) / (WL_W1 - WL_W0) * 100);
+    const byP = {};
+    const P = n => (byP[n] = byP[n] || { done:[], hand:[] });
+    allWorklog.forEach(w => {
+      const c = _wlDT(w.created_at), d = _wlDoneAt(w);
+      if (d && d >= d0 && d <= d1) {
+        let s = c && c >= d0 ? _wlMinOfDay(c) : WL_W0, e = _wlMinOfDay(d);
+        const cont = !c || c < d0;
+        s = Math.min(Math.max(s, WL_W0), WL_W1); e = Math.min(Math.max(e, WL_W0), WL_W1);
+        if (e - s < 15) { e = Math.min(s + 15, WL_W1); s = Math.min(s, e - 15); }
+        const real = c ? _wlWorkMinutes(c < d0 ? d0 : c, d) : 0;
+        P(_wlPerson(w)).done.push({ w, s, e, cont, real });
+      } else if ((!c || c <= d1) && (!d || d > d1) && !(d && d < d0)) {
+        P(_wlPerson(w)).hand.push(w);
+      }
     });
-    // เรียงตามคนเพื่อให้แถวกลุ่มติดกัน อ่านง่าย
-    rows.sort((a,b) => a[0].localeCompare(b[0]));
-    dt.addRows(rows);
-
-    const uniquePeople = new Set(rows.map(r => r[0])).size;
-    el.style.height = Math.max(120, uniquePeople * 41 + 40) + 'px';
-
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    new google.visualization.Timeline(el).draw(dt, {
-      backgroundColor: 'transparent',
-      colors: WL_CATEGORY_COLORS,
-      timeline: { showRowLabels: true, rowLabelStyle: { fontSize:11, color: isDark?'#ddd':'#333' }, barLabelStyle: { fontSize:10 } }
+    const people = Object.keys(byP).sort((a,b) => a.localeCompare(b, 'th'));
+    if (!people.length) { el.innerHTML = '<div class="empty-state fs-12">ไม่มีงานในวันนี้</div>'; return; }
+    let bg = '<div class="wl-lane-bg"><div class="lunch" style="left:' + pct(WL_L0) + '%;width:' + (pct(WL_L1) - pct(WL_L0)) + '%"></div>';
+    for (let m = WL_W0 + 30; m < WL_W1; m += 60) bg += '<div class="gl" style="left:' + pct(m) + '%"></div>';
+    bg += '</div>';
+    let h = (_wlIsWorkDay(d0) ? '' : '<div class="text-muted fs-12 mb-8">📅 วันนี้เป็นวันหยุด / เสาร์–อาทิตย์</div>') + '<div class="wl-axis">';
+    for (let m = WL_W0; m <= WL_W1; m += 60) h += '<span style="left:' + pct(m) + '%">' + _wlHM(m) + '</span>';
+    h += '</div>';
+    people.forEach(name => {
+      const p = byP[name];
+      const bars = p.done.sort((a,b) => a.s - b.s), lanes = [];
+      bars.forEach(b => { let i = lanes.findIndex(l => l[l.length-1].e <= b.s); if (i < 0) lanes.push([b]); else lanes[i].push(b); });
+      const hand = p.hand.sort((a,b) => (_wlIsLateNow(b) - _wlIsLateNow(a)) || String(a.due_date||'').localeCompare(String(b.due_date||'')));
+      h += `<div class="wl-prow"><div class="wl-pname" onclick="wlDrill(${_wlK('p:' + name)})" title="คลิกเพื่อดูงานทั้งหมดของคนนี้">${_wlEscapeHtml(name)}<small>เสร็จ ${bars.length} งาน · ในมือ ${hand.length} งาน</small></div><div>`;
+      lanes.forEach(l => {
+        h += '<div class="wl-lane">' + bg;
+        l.forEach(b => {
+          const ov = !b.cont && bars.some(o => o !== b && !o.cont && o.s < b.e && o.e > b.s);
+          const tip = b.w.title + '\n' + (b.cont ? 'เริ่มก่อนวันนี้ (' + fmtWLDueDate(_wlToBkkStr(b.w.created_at)) + ')' : 'เริ่ม ' + _wlHM(b.s)) + ' → เสร็จ ' + _wlHM(b.e) +
+            (b.cont ? '' : '\nใช้เวลา ' + (b.real/60).toFixed(1) + ' ชม. (เวลาทำงาน)') + (ov ? '\n⚠️ ทำซ้อนกับงานอื่น' : '') + '\nคลิกเพื่อเปิดงาน';
+          h += `<div class="wl-task${ov ? ' ov' : ''}${b.cont ? ' cont' : ''}" style="left:${pct(b.s)}%;width:${(pct(b.e) - pct(b.s))}%" title="${_wlEscapeHtml(tip)}" onclick="openWorklogModal('${_wlEscapeHtml(b.w.log_id)}')">${b.cont ? '◀ ' : ''}${_wlEscapeHtml(b.w.title)} · ${b.cont ? 'เสร็จ ' + _wlHM(b.e) : (b.real/60).toFixed(1) + ' ชม.'}</div>`;
+        });
+        h += '</div>';
+      });
+      const shown = hand.slice(0, 5);
+      h += '<div class="wl-hand">' + shown.map(w => `<span class="${_wlIsLateNow(w) ? 'late' : ''}" title="${_wlEscapeHtml(w.title)} · คลิกเพื่อเปิดงาน" onclick="openWorklogModal('${_wlEscapeHtml(w.log_id)}')">${_wlIsLateNow(w) ? '🔴' : '⏳'} ${_wlEscapeHtml(w.title)} · ส่ง ${w.due_date ? _wlDM(_wlDT(w.due_date)) : '—'}</span>`).join('') +
+        (hand.length > 5 ? `<span class="more" onclick="wlDrill(${_wlK('p:' + name)})">+ อีก ${hand.length - 5} งาน (ดูทั้งหมด)</span>` : '') + '</div></div></div>';
     });
+    el.innerHTML = h;
+  }
+
+  function _wlDrawRange(el) {
+    const days = [], todayYmd = _wlYmd(new Date());
+    const doneBy = {};
+    const S = _wlDashSets();
+    S.done.forEach(w => { const k = _wlPerson(w) + '|' + _wlYmd(_wlDoneAt(w)); (doneBy[k] = doneBy[k] || []).push(w); });
+    const hasDone = ymd => Object.keys(doneBy).some(k => k.endsWith('|' + ymd));
+    for (let d = _wlStartOfDay(wlPeriod.start), g = 0; d <= wlPeriod.end && g < 93; g++, d.setDate(d.getDate() + 1)) {
+      const ymd = _wlYmd(d);
+      if (_wlIsWorkDay(d) || hasDone(ymd)) days.push(new Date(d));
+    }
+    const people = Array.from(new Set(S.items.map(_wlPerson))).sort((a,b) => a.localeCompare(b, 'th'));
+    if (!people.length) { el.innerHTML = '<div class="empty-state fs-12">ไม่มีงานในช่วงเวลานี้</div>'; return; }
+    const compact = days.length > 7;
+    const maxN = Math.max(1, ...Object.values(doneBy).map(a => a.length));
+    const handNow = name => allWorklog.filter(w => _wlPerson(w) === name && w.status !== WL_DONE).length;
+    let h = '<table class="wl-week"><tr><th>คน</th>' + days.map(d => {
+      const t = _wlYmd(d) === todayYmd;
+      return compact
+        ? `<th style="padding:4px 0;${t ? 'color:var(--primary)' : ''}">${d.getDate()}<br><span style="font-weight:400">${WL_TH_DOW[d.getDay()]}</span></th>`
+        : `<th style="${t ? 'color:var(--primary)' : ''}">${WL_TH_DOW[d.getDay()]} ${_wlDM(d)}${t ? ' (วันนี้)' : ''}</th>`;
+    }).join('') + '</tr>';
+    people.forEach(name => {
+      const nDone = S.done.filter(w => _wlPerson(w) === name).length;
+      h += `<tr><td class="wl-pname" onclick="wlDrill(${_wlK('p:' + name)})">${_wlEscapeHtml(name)}<small>เสร็จ ${nDone} งาน · ในมือตอนนี้ ${handNow(name)} งาน</small></td>`;
+      days.forEach(d => {
+        const ymd = _wlYmd(d), list = doneBy[name + '|' + ymd] || [], k = _wlK('pd:' + name + '|' + ymd);
+        if (compact) {
+          const a = list.length / maxN;
+          h += '<td>' + (list.length ? `<span class="wl-heat" style="background:rgba(42,120,214,${(0.18 + 0.82*a).toFixed(2)});color:${a > 0.45 ? '#fff' : 'inherit'}" title="${list.length} งาน · คลิกเพื่อดูรายการ" onclick="wlDrill(${k})">${list.length}</span>` : '') +
+            (ymd === todayYmd ? `<span class="wl-chip h" style="padding:1px 0;text-align:center" title="งานในมือตอนนี้ ${handNow(name)} งาน">⏳${handNow(name)}</span>` : '') + '</td>';
+        } else {
+          h += '<td>' + (list.length ? `<div class="wl-cnt" onclick="wlDrill(${k})">✅ ${list.length} งาน</div>` : '') +
+            list.slice(0, 3).map(w => `<span class="wl-chip" title="${_wlEscapeHtml(w.title)} · คลิกเพื่อเปิดงาน" onclick="openWorklogModal('${_wlEscapeHtml(w.log_id)}')">${_wlEscapeHtml(w.title)}</span>`).join('') +
+            (list.length > 3 ? `<div class="wl-cnt" onclick="wlDrill(${k})">+ อีก ${list.length - 3} งาน</div>` : '') +
+            (ymd === todayYmd ? `<span class="wl-chip h">⏳ ในมือ ${handNow(name)} งาน</span>` : '') + '</td>';
+        }
+      });
+      h += '</tr>';
+    });
+    el.innerHTML = h + '</table>' + (compact ? '<div class="text-muted fs-11 mt-8">ตัวเลข = จำนวนงานที่เสร็จในวันนั้น (สีเข้ม = มาก) · คลิกเพื่อดูรายการ</div>' : '');
+  }
+
+  function refreshWlDashboard() {
+    if (!wlPeriod.start) { setWlPeriod('week'); return; } // setWlPeriod จะเรียก refresh ต่อเองอยู่แล้ว
+    const lab = document.getElementById('wl-period-label');
+    if (lab) lab.textContent = _wlYmd(wlPeriod.start) === _wlYmd(wlPeriod.end)
+      ? WL_TH_DOW[wlPeriod.start.getDay()] + ' ' + fmtWLDueDate(_wlYmd(wlPeriod.start))
+      : fmtWLDueDate(_wlYmd(wlPeriod.start)) + ' – ' + fmtWLDueDate(_wlYmd(wlPeriod.end));
+    renderWlStatCards();
+    renderWlDrill();
+    drawWorklogTimelineChart();
+    drawWorklogCategoryChart();
+    drawWorklogStaffChart();
+    drawWorklogDurationChart();
+    const foot = document.getElementById('wl-dash-foot');
+    if (foot) foot.textContent = wlHolidaySet === null ? 'กำลังโหลดวันหยุด…'
+      : (wlHolidayOk ? 'วันทำงาน = จ–ศ 08:30–17:30 ไม่นับพักเที่ยง หักเสาร์–อาทิตย์และวันหยุดบริษัทแล้ว · 1 วัน = 8 ชม.'
+                     : 'วันทำงาน = จ–ศ 08:30–17:30 ไม่นับพักเที่ยง หักเสาร์–อาทิตย์แล้ว (ยังไม่หักวันหยุดบริษัท) · 1 วัน = 8 ชม.');
+    if (wlHolidaySet === null) loadWlHolidays().then(() => { if (_wlDashboardTabActive) refreshWlDashboard(); });
   }
 
   // ── PDF เฉพาะแท็บ Dashboard (ข้อ 5 backlog รอบ 2) — ใช้ window.print()
