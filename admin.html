@@ -711,12 +711,12 @@
   function renderFAQs(faqs) {
     document.getElementById('faq-list').innerHTML = faqs.length
       ? faqs.map((f,i)=>`
-        <div class="kb-card ${f.is_active==='TRUE'?'kb-approved':''}">
+        <div class="kb-card ${_isActive(f)?'kb-approved':''}">
           <div class="d-flex justify-between align-center mb-8">
             <span class="fw-600 fs-13">${f.question_th||'—'}</span>
             <div class="d-flex gap-8">
               <span class="text-muted fs-11">ถูกใช้ ${f.usage_count||0} ครั้ง</span>
-              <span class="badge" style="background:${f.is_active==='TRUE'?'#e6f4ea':'#fce8e6'};color:${f.is_active==='TRUE'?'#137333':'#c62828'}">${f.is_active==='TRUE'?'Active':'Inactive'}</span>
+              <span class="badge" style="background:${_isActive(f)?'#e6f4ea':'#fce8e6'};color:${_isActive(f)?'#137333':'#c62828'}">${_isActive(f)?'Active':'Inactive'}</span>
             </div>
           </div>
           <div class="text-secondary fs-12 mb-8">${f.answer_th||'—'}</div>
@@ -763,7 +763,7 @@
     const approvedIds = new Set((kbRes.success?kbRes.data:[]).map(k=>k.source_ticket_id));
 
     const pending  = tickets.filter(t=>t.ai_approved_learning==='PENDING' && t.resolution);
-    const approved = (kbRes.success?kbRes.data:[]).filter(k=>k.is_active==='TRUE');
+    const approved = (kbRes.success?kbRes.data:[]).filter(k=>_isActive(k));
 
     document.getElementById('kb-pending-list').innerHTML = pending.length
       ? pending.map(t=>`
@@ -842,7 +842,7 @@
             <div class="fw-600 fs-13">${h.holiday_name_th||'—'}</div>
             <div class="text-muted fs-11">${h.holiday_name_en||''}</div>
           </div>
-          <div><span class="badge" style="background:${h.is_active==='TRUE'?'#e6f4ea':'#f5f5f5'};color:${h.is_active==='TRUE'?'#137333':'#999'}">${h.is_active==='TRUE'?'Active':'Inactive'}</span></div>
+          <div><span class="badge" style="background:${_isActive(h)?'#e6f4ea':'#f5f5f5'};color:${_isActive(h)?'#137333':'#999'}">${_isActive(h)?'Active':'Inactive'}</span></div>
           <div></div>
         </div>`).join('')
       : '<div class="empty-state"><div class="empty-icon">🗓️</div><h3>ยังไม่มีวันหยุด</h3></div>';
