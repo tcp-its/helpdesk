@@ -1074,8 +1074,9 @@
   }
 
   async function loadWorklog() {
-    await Promise.all([loadWorklogUsers(), loadWorklogCategories()]);
-    const res = await API.get('worklog/list');
+    // [Perf 2026-09-29] โหลดรายชื่อ, หมวดหมู่ และรายการงาน "พร้อมกัน" ในรอบเดียว
+    // (เดิมรอ 2 อย่างแรกเสร็จก่อนค่อยโหลดรายการงาน = รอ backend 2 รอบต่อกัน)
+    const [, , res] = await Promise.all([loadWorklogUsers(), loadWorklogCategories(), API.get('worklog/list')]);
     allWorklog = res.success ? res.data : [];
     renderWorklog();
     drawWorklogCategoryChart();
