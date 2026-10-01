@@ -205,6 +205,9 @@
                 <option>🔄 กำลังทำ</option>
                 <option>✅ เสร็จแล้ว</option>
               </select>
+              <!-- [Feat 2026-10-01] กรองตามผู้รับผิดชอบ (ใช้ร่วมกับแท็บ Dashboard / Excel) -->
+              <select class="form-control wl-person-filter" style="width:230px" onchange="setWlPersonFilter(this.value)" title="ผู้รับผิดชอบ"><option value="">👥 ทุกคน</option></select>
+              <button class="btn btn-secondary btn-sm" id="wl-clear-filters" style="display:none" onclick="clearWlFilters()" title="กลับไปค่าเริ่มต้น">↺ ล้างตัวกรอง</button>
               <button class="btn btn-secondary btn-sm" onclick="exportWorklogExcel()">📥 Excel</button>
               <button class="btn btn-secondary btn-sm" onclick="exportWorklogPDF()">🖨️ PDF</button>
               <button class="btn btn-secondary btn-sm" id="btn-wl-categories" style="display:none" onclick="openCategoryManageModal()">⚙️ จัดการหมวดหมู่</button>
@@ -235,6 +238,7 @@
           <div class="card mb-16 wl-dash-filter-row">
             <div class="d-flex justify-between align-center" style="flex-wrap:wrap;gap:10px">
               <div class="d-flex gap-8" style="flex-wrap:wrap;align-items:center">
+                <select class="form-control wl-person-filter" style="width:230px" onchange="setWlPersonFilter(this.value)" title="ผู้รับผิดชอบ"><option value="">👥 ทุกคน</option></select>
                 <span class="fs-12 text-muted">ช่วงเวลา:</span>
                 <button class="wl-period-btn" id="wl-period-btn-today" onclick="setWlPeriod('today')">วันนี้</button>
                 <button class="wl-period-btn active" id="wl-period-btn-week" onclick="setWlPeriod('week')">สัปดาห์นี้</button>
@@ -619,6 +623,59 @@
   // IT_STAFF เข้าถึงได้ผ่านเมนูจริง — ดึงรายชื่อผู้ใช้ผ่าน users/lookup
   // (IT_STAFF+ เรียกได้) แทน API.get('users') เดิมที่เป็น IT_MANAGER เท่านั้น
   let allWorklog   = [];
+
+  // ── [Feat 2026-10-01] ตัวกรองผู้รับผิดชอบ — '__me__' = ของฉัน, '' = ทุกคน, หรืออีเมล
+  // ค่าเริ่มต้น: Staff = ของฉัน · Manager = ทุกคน · จำค่าล่าสุดในเบราว์เซอร์ (localStorage)
+  // เป็นตัวช่วยการดูเท่านั้น ไม่ใช่การจำกัดสิทธิ์ (backend ยังส่งงานทุกคนให้ IT_STAFF+)
+  const WL_PERSON_KEY = 'wl_person_filter';
+  let wlPersonFilter = null;
+  function _wlMyEmail() { return String((getCurrentUser() || {}).email || '').toLowerCase(); }
+  function _wlPersonDefault() { return isManager() ? '' : '__me__'; }
+  function _wlPersonMatch(w) {
+    if (!wlPersonFilter) return true;
+    const a = String(w.assigned_to || '').toLowerCase();
+    return wlPersonFilter === '__me__' ? a === _wlMyEmail() : a === wlPersonFilter;
+  }
+  function _wlBase() { return allWorklog.filter(_wlPersonMatch); }
+  function buildWlPersonFilter() {
+    if (wlPersonFilter === null) {
+      let saved = null;
+      try { saved = localStorage.getItem(WL_PERSON_KEY); } catch (e) {}
+      wlPersonFilter = saved !== null ? saved : _wlPersonDefault();
+    }
+    const open = {}, emails = new Set();
+    allWorklog.forEach(w => {
+      const a = String(w.assigned_to || '').toLowerCase(); if (!a) return;
+      emails.add(a); if (w.status !== '✅ เสร็จแล้ว') open[a] = (open[a] || 0) + 1;
+    });
+    const nameOf = e => (wlUsers.find(u => String(u.email || '').toLowerCase() === e) || {}).display_name || e;
+    const people = [...emails].sort((x, y) => nameOf(x).localeCompare(nameOf(y), 'th'));
+    if (wlPersonFilter && wlPersonFilter !== '__me__' && !emails.has(wlPersonFilter)) wlPersonFilter = _wlPersonDefault();
+    const me = _wlMyEmail();
+    const html = `<option value="__me__">👤 ของฉัน (ค้าง ${open[me] || 0})</option><option value="">👥 ทุกคน</option>` +
+      people.map(e => `<option value="${_wlEscapeHtml(e)}">${_wlEscapeHtml(nameOf(e))} (ค้าง ${open[e] || 0})</option>`).join('');
+    document.querySelectorAll('.wl-person-filter').forEach(sel => { sel.innerHTML = html; sel.value = wlPersonFilter; });
+  }
+  // ปุ่ม ↺ ล้างตัวกรอง — แสดงเฉพาะตอนที่ตัวกรองต่างจากค่าเริ่มต้น
+  function updateWlClearBtn() {
+    const btn = document.getElementById('wl-clear-filters'); if (!btn) return;
+    const dirty = (document.getElementById('wl-filter-category')?.value || '') ||
+                  (document.getElementById('wl-filter-status')?.value || '') ||
+                  (wlPersonFilter !== null && wlPersonFilter !== _wlPersonDefault());
+    btn.style.display = dirty ? '' : 'none';
+  }
+  function clearWlFilters() {
+    document.getElementById('wl-filter-category').value = '';
+    document.getElementById('wl-filter-status').value = '';
+    setWlPersonFilter(_wlPersonDefault());
+  }
+  function setWlPersonFilter(v) {
+    wlPersonFilter = v;
+    try { localStorage.setItem(WL_PERSON_KEY, v); } catch (e) {}
+    document.querySelectorAll('.wl-person-filter').forEach(sel => { sel.value = v; });
+    renderWorklog();
+    if (_wlDashboardTabActive) refreshWlDashboard();
+  }
   let wlUsers      = [];
   let wlCategories = [];  // [Feat 2026-09-24] ข้อ 5: โหลดจาก worklog/categories แทนของตายตัวเดิม
 
@@ -740,8 +797,8 @@
   }
 
   function _wlItemsInPeriod() {
-    if (!wlPeriod.start || !wlPeriod.end) return allWorklog;
-    return allWorklog.filter(w => {
+    if (!wlPeriod.start || !wlPeriod.end) return _wlBase();
+    return _wlBase().filter(w => {
       const { start, end } = _wlItemSpan(w);
       return start <= wlPeriod.end && end >= wlPeriod.start;
     });
@@ -970,7 +1027,7 @@
     const pct = m => ((m - WL_W0) / (WL_W1 - WL_W0) * 100);
     const byP = {};
     const P = n => (byP[n] = byP[n] || { done:[], hand:[] });
-    allWorklog.forEach(w => {
+    _wlBase().forEach(w => {
       const c = _wlDT(w.created_at), d = _wlDoneAt(w);
       if (d && d >= d0 && d <= d1) {
         let s = c && c >= d0 ? _wlMinOfDay(c) : WL_W0, e = _wlMinOfDay(d);
@@ -1028,7 +1085,7 @@
     if (!people.length) { el.innerHTML = '<div class="empty-state fs-12">ไม่มีงานในช่วงเวลานี้</div>'; return; }
     const compact = days.length > 7;
     const maxN = Math.max(1, ...Object.values(doneBy).map(a => a.length));
-    const handNow = name => allWorklog.filter(w => _wlPerson(w) === name && w.status !== WL_DONE).length;
+    const handNow = name => _wlBase().filter(w => _wlPerson(w) === name && w.status !== WL_DONE).length;
     let h = '<table class="wl-week"><tr><th>คน</th>' + days.map(d => {
       const t = _wlYmd(d) === todayYmd;
       return compact
@@ -1223,7 +1280,10 @@
   // (CSV + BOM ให้ Excel เปิดแล้วอ่านภาษาไทยถูกต้อง — ไม่ใช้ไลบรารีเพิ่ม)
   function exportWorklogExcel() {
     const header = ['เลขที่','ชื่องาน','หมวดหมู่','ผู้รับผิดชอบ','กำหนดส่ง','เลื่อนแล้ว(ครั้ง)','สถานะ','รายละเอียด','ผลการดำเนินงาน'];
-    const rows = allWorklog.map(w => [
+    // [Feat 2026-10-01] ส่งออกตามตัวกรองที่เห็นอยู่ (หมวดหมู่ / สถานะ / ผู้รับผิดชอบ)
+    const catF = document.getElementById('wl-filter-category')?.value || '';
+    const stF  = document.getElementById('wl-filter-status')?.value || '';
+    const rows = _wlBase().filter(w => (!catF || w.category === catF) && (!stF || w.status === stF)).map(w => [
       w.log_no||'', w.title||'', w.category||'',
       (wlUsers.find(u=>u.email===w.assigned_to)||{}).display_name || w.assigned_to || '',
       fmtWLDueDate(w.due_date), w.reschedule_count||0, w.status||'',
@@ -1265,6 +1325,7 @@
     // (เดิมรอ 2 อย่างแรกเสร็จก่อนค่อยโหลดรายการงาน = รอ backend 2 รอบต่อกัน)
     const [, , res] = await Promise.all([loadWorklogUsers(), loadWorklogCategories(), API.get('worklog/list')]);
     allWorklog = res.success ? res.data : [];
+    buildWlPersonFilter();
     renderWorklog();
     drawWorklogCategoryChart();
     // ถ้า user คลิกไปแท็บ Dashboard ไว้ก่อนที่ loadWorklog() จะโหลดเสร็จ (เช่น
@@ -1312,7 +1373,8 @@
   function renderWorklog() {
     const catFilter = document.getElementById('wl-filter-category')?.value || '';
     const stFilter  = document.getElementById('wl-filter-status')?.value || '';
-    let items = allWorklog;
+    updateWlClearBtn();
+    let items = _wlBase();
     if (catFilter) items = items.filter(w => w.category === catFilter);
     if (stFilter)  items = items.filter(w => w.status === stFilter);
 
@@ -1326,7 +1388,7 @@
 
     const tbody = document.getElementById('worklog-tbody');
     if (!items.length) {
-      tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="padding:40px"><div class="empty-state"><div class="empty-icon">📋</div><h3>ยังไม่มีบันทึกงาน</h3></div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="padding:40px"><div class="empty-state"><div class="empty-icon">📋</div><h3>' + ((catFilter || stFilter || wlPersonFilter) ? 'ไม่มีงานตามตัวกรองนี้' : 'ยังไม่มีบันทึกงาน') + '</h3></div></td></tr>';
       return;
     }
 
