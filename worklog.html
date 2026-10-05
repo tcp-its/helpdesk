@@ -194,6 +194,7 @@
 
         <!-- ══════════════════════ แท็บ: รายการงาน ══════════════════════ -->
         <div id="wl-tab-list">
+          <div id="wl-refresh-note" class="text-muted fs-12" style="display:none;margin-bottom:6px">🔄 กำลังอัปเดตรายการ…</div>
           <div class="d-flex justify-between align-center mb-16" style="flex-wrap:wrap;gap:10px">
             <div class="d-flex gap-8" id="wl-actions-row" style="flex-wrap:wrap;align-items:center">
               <select class="form-control" id="wl-filter-category" style="width:170px" onchange="renderWorklog()">
@@ -1577,7 +1578,7 @@
       if (res.success) {
         const savedLogId = res.data.log_id || logId;
         await _wlUploadSelectedAttachments(savedLogId);
-        showToast('บันทึกสำเร็จ','success'); closeModal('worklog-modal'); await loadWorklog();
+        showToast('บันทึกสำเร็จ','success'); closeModal('worklog-modal'); _wlRefreshAfterSave();
       }
       else showToast(res.data?.error||'เกิดข้อผิดพลาด','error');
     } catch(e) { showToast('เกิดข้อผิดพลาด','error'); }
@@ -1608,6 +1609,20 @@
     }
   }
 
+  // [Fix 2026-10-05] เดิมหลังบันทึก/เลื่อน/ลบสำเร็จ จะรอ loadWorklog() (เรียก backend 3 ครั้ง
+  // ~3–6 วินาที หรือนานกว่าถ้า Apps Script ช้า) ทั้งที่วงหมุน "กำลังบันทึก..." ยังบังจออยู่
+  // ผู้ใช้จึงเห็นว่า "สำเร็จ" แต่หน้าค้าง — เปลี่ยนเป็นปิดวงหมุนทันที แล้วโหลดรายการใหม่เบื้องหลัง
+  let _wlRefreshing = null;
+  function _wlRefreshAfterSave() {
+    hideLoader();
+    const lbl = document.getElementById('wl-refresh-note');
+    if (lbl) lbl.style.display = '';
+    _wlRefreshing = loadWorklog()
+      .catch(e => { console.warn('[WL refresh]', e); showToast('โหลดรายการใหม่ไม่สำเร็จ — กด F5','warning'); })
+      .finally(() => { if (lbl) lbl.style.display = 'none'; _wlRefreshing = null; });
+    return _wlRefreshing;
+  }
+
   async function saveReschedule() {
     const logId = document.getElementById('wl-resched-log-id').value;
     const dueDate = parseWLDueDate(document.getElementById('wl-resched-new-date').value);
@@ -1618,7 +1633,13 @@
     showLoader('กำลังบันทึก...');
     try {
       const res = await API.post('worklog/reschedule', { id: logId, due_date: dueDate, reason: reason });
-      if (res.success) { showToast('เลื่อนกำหนดสำเร็จ','success'); closeModal('worklog-reschedule-modal'); await loadWorklog(); }
+      if (res.success) {
+        showToast('เลื่อนกำหนดสำเร็จ','success'); closeModal('worklog-reschedule-modal');
+        // อัปเดตแถวในหน้าทันที (ไม่ต้องรอโหลดใหม่ทั้งหมด)
+        const it = allWorklog.find(w => w.log_id === logId);
+        if (it) { it.due_date = dueDate; it.reschedule_count = (parseInt(it.reschedule_count, 10) || 0) + 1; renderWorklog(); }
+        _wlRefreshAfterSave();
+      }
       else showToast(res.data?.error||'เกิดข้อผิดพลาด','error');
     } catch(e) { showToast('เกิดข้อผิดพลาด','error'); }
     finally { hideLoader(); }
@@ -1629,7 +1650,7 @@
     showLoader('กำลังลบ...');
     try {
       const res = await API.post('worklog/delete', { id: logId });
-      if (res.success) { showToast('ลบสำเร็จ','success'); await loadWorklog(); }
+      if (res.success) { showToast('ลบสำเร็จ','success'); _wlRefreshAfterSave(); }
       else showToast(res.data?.error||'เกิดข้อผิดพลาด','error');
     } catch(e) { showToast('เกิดข้อผิดพลาด','error'); }
     finally { hideLoader(); }
