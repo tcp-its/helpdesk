@@ -803,6 +803,14 @@
     // แปลง DD/MM/YYYY → YYYY-MM-DD สำหรับ backend
     const tdateParsed = parseDDMMYYYY(tdateRaw);
     if (prio === 'Normal' && !tdateParsed) { showToast('รูปแบบวันที่ไม่ถูกต้อง กรุณากรอก DD/MM/YYYY', 'warning'); return; }
+    // [Fix 2026-10-06] กันปีผิด — วันที่ต้องการต้องไม่ย้อนหลังเกินวันนี้ และไม่เกิน 1 ปีข้างหน้า
+    if (tdateParsed) {
+      const _today = new Date(); _today.setHours(0,0,0,0);
+      const _max = new Date(_today); _max.setFullYear(_max.getFullYear() + 1);
+      if (tdateParsed < _today || tdateParsed > _max) {
+        showToast('วันที่ต้องการให้เสร็จต้องอยู่ระหว่างวันนี้ ถึง 1 ปีข้างหน้า (ปี ค.ศ. เช่น ' + _today.getFullYear() + ')', 'warning'); return;
+      }
+    }
     const tdate = tdateParsed
       ? tdateParsed.getFullYear() + '-' + String(tdateParsed.getMonth()+1).padStart(2,'0') + '-' + String(tdateParsed.getDate()).padStart(2,'0')
       : '';
