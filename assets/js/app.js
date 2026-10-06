@@ -287,7 +287,11 @@ function parseDDMMYYYY(str) {
   if (parts.length !== 3) return null;
   const [d, m, y] = parts;
   if (!d || !m || !y || y.length !== 4) return null;
-  const date = new Date(y + '-' + m.padStart(2, '0') + '-' + d.padStart(2, '0'));
+  // [Fix 2026-10-06] ผู้ใช้กรอกปี พ.ศ. (เช่น 05/10/2569) → แปลงเป็น ค.ศ. อัตโนมัติ
+  // เดิมรับ 2569 เป็น ค.ศ. ทำให้ SLA Deadline อยู่อีก 543 ปี และ runSLACheck วนนับวันจนช้า 3–30 นาที/รอบ
+  let yy = parseInt(y, 10);
+  if (yy > 2400) yy -= 543;
+  const date = new Date(yy + '-' + m.padStart(2, '0') + '-' + d.padStart(2, '0'));
   return isNaN(date.getTime()) ? null : date;
 }
 
