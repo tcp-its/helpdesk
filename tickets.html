@@ -972,7 +972,7 @@
       <div class="detail-meta-item"><div class="detail-meta-label">ผู้แจ้ง</div><div class="detail-meta-value">${t.requester_name}</div></div>
       <div class="detail-meta-item"><div class="detail-meta-label">สร้างเมื่อ</div><div class="detail-meta-value">${formatDate(t.created_at)}</div></div>
       ${t.sla_deadline ? `<div class="detail-meta-item"><div class="detail-meta-label">SLA Deadline</div><div class="detail-meta-value" style="color:${new Date(t.sla_deadline)<new Date()?'var(--danger)':'var(--warning)'}">${formatDate(t.sla_deadline)}</div></div>` : ''}
-      ${String(t.sla_version) === '2' && t.target_date ? `<div class="detail-meta-item"><div class="detail-meta-label">ผู้ใช้ต้องการ</div><div class="detail-meta-value">${t.target_date}${t.user_wants_sooner === 'TRUE' || t.user_wants_sooner === true ? ' ⚡' : ''}</div></div>` : ''}
+      ${String(t.sla_version) === '2' && t.target_date ? `<div class="detail-meta-item"><div class="detail-meta-label">ผู้ใช้ต้องการ</div><div class="detail-meta-value">${dateToDDMMYYYY(t.target_date) || t.target_date}${t.user_wants_sooner === 'TRUE' || t.user_wants_sooner === true ? ' ⚡' : ''}</div></div>` : ''}
       ${t.agreed_due_date ? `<div class="detail-meta-item"><div class="detail-meta-label">กำหนดที่ตกลงกับผู้ใช้</div><div class="detail-meta-value" title="${t.agreed_due_reason || ''}">${formatDate(t.agreed_due_date)}</div></div>` : ''}
       ${t.assigned_name ? `<div class="detail-meta-item"><div class="detail-meta-label">ผู้รับผิดชอบ</div><div class="detail-meta-value">${t.assigned_name}</div></div>` : ''}
     `;
@@ -1238,6 +1238,7 @@
     f.style.display = f.style.display === 'none' ? 'block' : 'none';
   }
   // [Fix 2026-10-24] sla_version จากชีตเป็นตัวเลข → เทียบด้วย String() ทุกจุด (6 จุด)
+  // [Fix 2026-10-24b] ช่อง "ผู้ใช้ต้องการ" แสดงวันที่เป็น DD/MM/YYYY (เดิมเป็น ISO ดิบ)
   function renderSlaV2Section(t) {
     const sec = document.getElementById('sla-v2-section');
     if (String(t.sla_version) !== '2' || t.status === 'Done' || t.status === 'Pending Approval') {
