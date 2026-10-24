@@ -19,6 +19,12 @@
     #loading-state { display: none; }
     .dots::after { content: ''; animation: dots 1.5s steps(4,end) infinite; }
     @keyframes dots { 0%,20%{content:''} 40%{content:'.'} 60%{content:'..'} 80%,100%{content:'...'} }
+      /* [Fix 2026-10-24d] Night mode หน้า Login — การ์ดสีขาวตายตัว ทำให้ชื่อระบบสีอ่อนกลืนพื้น (โหมดสว่างไม่เปลี่ยน) */
+    [data-theme="dark"] .login-page { background: var(--bg) !important; }
+    [data-theme="dark"] .login-card { background: var(--surface) !important; border-color: var(--border) !important; }
+    [data-theme="dark"] .feature { background: #1a2740 !important; border-color: #2d4470 !important; }
+    [data-theme="dark"] .feature-title { color: var(--text) !important; }
+    [data-theme="dark"] .feature-text { color: var(--text-secondary) !important; }
   </style>
 </head>
 <body>
