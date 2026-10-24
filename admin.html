@@ -240,6 +240,7 @@
               <option value="UPDATE_ROLE">เปลี่ยนสิทธิ์</option>
               <option value="SLA_BREACH">SLA เกินกำหนด</option>
               <option value="KB_APPROVED">อนุมัติ Knowledge Base</option>
+              <option value="KB_REJECTED">ปฏิเสธ Knowledge Base</option>
               <option value="CONFIG_UPDATE">แก้ไขการตั้งค่า</option>
               <option value="CREATE_WORKLOG">สร้างบันทึกงานภายใน</option>
               <option value="UPDATE_WORKLOG">แก้ไขบันทึกงานภายใน</option>
@@ -805,10 +806,18 @@
     finally { hideLoader(); }
   }
 
+  // [Fix 2026-10-01] เดิมส่งผ่าน ticket/update ซึ่ง backend ไม่รับช่อง ai_approved_learning
+  // (ค่าถูกทิ้ง Ticket ค้าง PENDING) — เปลี่ยนไปใช้ ai/reject-kb (IT_MANAGER + audit) และแจ้ง error
   async function rejectKB(ticketId) {
-    if (!confirm('ปฏิเสธการเรียนรู้จาก Ticket นี้?')) return;
-    const res = await API.post('ticket/update',{ ticket_id: ticketId, ai_approved_learning: 'FALSE' });
-    if (res.success) { showToast('ปฏิเสธแล้ว','info'); await loadKBPending(); }
+    const reason = prompt('ปฏิเสธการเรียนรู้จาก Ticket ' + ticketId + '?\nเหตุผล (ไม่บังคับ):', '');
+    if (reason === null) return; // กดยกเลิก
+    showLoader('กำลังปฏิเสธ...');
+    try {
+      const res = await API.post('ai/reject-kb', { ticket_id: ticketId, reason: reason.trim() });
+      if (res.success) { showToast('ปฏิเสธแล้ว — AI จะไม่เรียนรู้จาก Ticket นี้','info'); await loadKBPending(); }
+      else showToast('ปฏิเสธไม่สำเร็จ: ' + (res.data?.error || 'กรุณาลองใหม่'),'error');
+    } catch(e) { showToast('เกิดข้อผิดพลาด','error'); }
+    finally { hideLoader(); }
   }
 
   // ── SLA CONFIG ───────────────────────────────────────────────
@@ -910,7 +919,7 @@
     ASSIGN_TICKET:'มอบหมายงาน', CLOSE_TICKET:'ปิด Ticket', REOPEN_TICKET:'เปิด Ticket ใหม่อีกครั้ง',
     ADD_RESOLUTION:'เพิ่มวิธีแก้ไข', SATISFACTION_SCORE:'ให้คะแนน', SLA_UPDATE:'อัปเดต SLA',
     SLA_BREACH:'SLA เกินกำหนด', CREATE_USER:'สร้างผู้ใช้งาน', UPDATE_USER:'แก้ไขผู้ใช้',
-    UPDATE_ROLE:'เปลี่ยนสิทธิ์', USER_LOGIN:'เข้าสู่ระบบ', KB_APPROVED:'อนุมัติ Knowledge Base',
+    UPDATE_ROLE:'เปลี่ยนสิทธิ์', USER_LOGIN:'เข้าสู่ระบบ', KB_APPROVED:'อนุมัติ Knowledge Base', KB_REJECTED:'ปฏิเสธ Knowledge Base',
     CONFIG_UPDATE:'แก้ไขการตั้งค่า', FAQ_CREATED:'สร้าง FAQ', FAQ_UPDATED:'แก้ไข FAQ',
     AI_RESPONSE:'AI ตอบคำถาม', FAQ_MATCH:'ตอบจาก FAQ', GEMINI_CALL:'เรียกใช้ AI',
     // [Fix 2026-09-23] เพิ่ม action ของ Internal Work Log — เดิม auditLog()
@@ -932,7 +941,7 @@
   };
   const AUDIT_ICON = {
     CREATE_TICKET:'🎫', UPDATE_STATUS:'🔄', CLOSE_TICKET:'✅', ASSIGN_TICKET:'👤',
-    ADD_RESOLUTION:'💡', UPDATE_ROLE:'🔑', SLA_BREACH:'🚨', KB_APPROVED:'📚',
+    ADD_RESOLUTION:'💡', UPDATE_ROLE:'🔑', SLA_BREACH:'🚨', KB_APPROVED:'📚', KB_REJECTED:'🚫',
     CREATE_WORKLOG:'📋', UPDATE_WORKLOG:'✏️', RESCHEDULE_WORKLOG:'🔁', DELETE_WORKLOG:'🗑️',
     WORKLOG_WEEKLY_SUMMARY:'🤖', WORKLOG_CATEGORY_UPDATE:'🏷️', WORKLOG_RESCHEDULE_ALERT:'📧',
     ATTACH_WORKLOG_FILE:'📎', EXPORT_TICKET:'📄',

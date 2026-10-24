@@ -86,6 +86,8 @@
       </div>
 
       <!-- Status Quick Tabs -->
+      <!-- [Feat 2026-10-03] SLA v2 — Manager: การหยุดนับของ Staff ที่รอตรวจ -->
+      <div id="pause-review-banner" style="display:none;padding:10px 14px;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;margin-bottom:12px;font-size:13px"></div>
       <div id="status-tabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
 
       <!-- Filter Dropdown Panel -->
@@ -102,6 +104,8 @@
               <option>Reopened</option>
               <option>SLA Risk</option>
               <option>Over SLA</option>
+              <option>รอผู้ใช้</option>
+              <option>รอ vendor/อะไหล่</option>
             </select>
           </div>
           <div>
@@ -383,6 +387,32 @@
             ⏳ ส่งขออนุมัติปิดแล้ว — รอ Manager ตรวจสอบ
           </div>
 
+          <!-- [Feat 2026-10-03] SLA v2 — หยุดนับ / เริ่มนับต่อ / ประวัติ (เฉพาะ Ticket ที่ใช้กติกาใหม่) -->
+          <div id="sla-v2-section" style="display:none;padding:12px;background:#fffdf5;border:1px solid #ffe082;border-radius:8px;margin-bottom:16px">
+            <label class="form-label" style="color:#b26a00">⏱ SLA (กติกาใหม่)</label>
+            <div id="sla-v2-summary" class="fs-12" style="margin-bottom:8px"></div>
+            <div id="sla-v2-pause-form" style="display:none">
+              <select class="form-control" id="pause-type-select" onchange="onPauseTypeChange()">
+                <option value="USER">⏸ รอผู้ใช้ (ขอข้อมูล / นัดเวลา / รอทดสอบ)</option>
+                <option value="VENDOR">📦 รอ vendor/อะไหล่</option>
+              </select>
+              <textarea class="form-control mt-8" id="pause-reason-input" rows="2" placeholder="เหตุผลที่หยุดนับ (จำเป็น) — ระบบจะแจ้งผู้ใช้"></textarea>
+              <div id="pause-vendor-fields" style="display:none">
+                <input class="form-control mt-8" id="pause-vendor-name" placeholder="ชื่อผู้ขาย (จำเป็น)">
+                <label class="form-label fs-11 mt-8">วันที่คาดว่าจะได้ของ (ETA)</label>
+                <input type="datetime-local" class="form-control" id="pause-vendor-eta">
+              </div>
+              <button class="btn btn-warning btn-block mt-8" onclick="doPauseTicket()">⏸ ยืนยันหยุดนับ</button>
+            </div>
+            <div id="sla-v2-resume-form" style="display:none">
+              <textarea class="form-control" id="resume-note-input" rows="2" placeholder="สรุปสิ่งที่ได้รับ 1 บรรทัด (จำเป็น) เช่น ได้ไฟล์ตัวอย่างแล้ว"></textarea>
+              <button class="btn btn-success btn-block mt-8" onclick="doResumeTicket()">▶ เริ่มนับต่อ</button>
+            </div>
+            <button class="btn btn-secondary btn-block mt-8" id="sla-v2-pause-toggle" onclick="togglePauseForm()">⏸ หยุดนับ</button>
+            <div class="form-label fs-11 mt-8">ประวัติการหยุดนับ</div>
+            <div id="sla-v2-pause-log" class="fs-12 text-muted">—</div>
+          </div>
+
           <div id="normal-actions-section">
             <!-- Status Update -->
             <div class="form-group">
@@ -404,6 +434,18 @@
               </select>
             </div>
 
+            <!-- [Feat 2026-10-03] ข้อ 4 — เปลี่ยนความเร่งด่วน (ต้องระบุเหตุผล) -->
+            <div class="form-group">
+              <label class="form-label">ความเร่งด่วน</label>
+              <div style="display:flex;gap:6px">
+                <select class="form-control" id="detail-priority-select" style="flex:0 0 110px">
+                  <option>Urgent</option><option>Normal</option><option>Low</option>
+                </select>
+                <input class="form-control" id="detail-priority-reason" placeholder="เหตุผลที่เปลี่ยน (จำเป็น)">
+              </div>
+              <button class="btn btn-secondary btn-block mt-4" onclick="savePriorityChange()">💾 บันทึกความเร่งด่วน</button>
+            </div>
+
             <!-- Resolution -->
             <div class="form-group">
               <label class="form-label">วิธีแก้ไข</label>
@@ -414,6 +456,18 @@
             <div class="form-group">
               <label class="form-label">Root Cause</label>
               <textarea class="form-control" id="detail-rootcause-input" rows="2" placeholder="สาเหตุของปัญหา..."></textarea>
+            </div>
+
+            <!-- [Feat 2026-10-03] ข้อ 3 — เวลาทำงานจริงของ IT (บังคับตอนปิดงาน) -->
+            <div class="form-group">
+              <label class="form-label">⏱ เวลาทำงานจริง (นาที) <span class="text-muted fs-11">— จำเป็นตอนปิด Ticket</span></label>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <input type="number" min="1" max="10000" class="form-control" id="detail-itwork-input" style="flex:0 0 100px" placeholder="นาที">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="setItWork(15)">15</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="setItWork(30)">30</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="setItWork(60)">60</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="setItWork(120)">120</button>
+              </div>
             </div>
 
             <div style="display:flex;flex-direction:column;gap:8px">
@@ -635,6 +689,19 @@
       showToast('ไม่สามารถโหลด Ticket ได้', 'error');
     }
     try { updateStatusTabs(allTickets); } catch(e) { console.error('updateStatusTabs error:', e); }
+    try { loadPauseReviewBanner(); } catch(e) { console.error('loadPauseReviewBanner error:', e); }
+  }
+
+  // [Feat 2026-10-03] SLA v2 — Manager เห็นรายการหยุดนับของ Staff ที่รอตรวจ
+  async function loadPauseReviewBanner() {
+    const el = document.getElementById('pause-review-banner');
+    if (!el || !isManager()) return;
+    const res = await API.get('sla/pause-pending');
+    const list = res.success ? (res.data || []) : [];
+    if (!list.length) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    el.innerHTML = '⏸ <b>การหยุดนับรอ Manager ตรวจ ' + list.length + ' รายการ</b> — ' +
+      list.map(r => `<a href="#" onclick="event.preventDefault();openTicketDetail('${r.ticket_id}')" style="margin-right:8px">${r.ticket_id}</a>`).join('');
   }
 
   // ── Render Table ────────────────────────────────────────────
@@ -647,7 +714,9 @@
     }
     tbody.innerHTML = tickets.map(t => {
       const rowClass = t.priority === 'Urgent' ? 'urgent' : t.status === 'Over SLA' ? 'over-sla' : t.status === 'SLA Risk' ? 'sla-risk' : '';
-      const slaText  = t.sla_deadline ? `<span style="color:${new Date(t.sla_deadline)<new Date()?'var(--danger)':'var(--text-secondary)'};font-size:11px">${formatDate(t.sla_deadline)}</span>` : '<span class="text-muted">—</span>';
+      const slaText  = (t.status === 'รอผู้ใช้' || t.status === 'รอ vendor/อะไหล่')
+        ? '<span style="color:#b26a00;font-size:11px">⏸ หยุดนับ</span>'
+        : t.sla_deadline ? `<span style="color:${new Date(t.sla_deadline)<new Date()?'var(--danger)':'var(--text-secondary)'};font-size:11px">${formatDate(t.sla_deadline)}</span>` : '<span class="text-muted">—</span>';
       return `<tr class="${rowClass}" onclick="openTicketDetail('${t.ticket_id}')">
         <td><span style="font-weight:700;color:var(--primary);font-size:12px">${t.ticket_id}</span></td>
         <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.title||'—'}</td>
@@ -674,7 +743,9 @@
     { label: '🔎 Pending Approval', value: 'Pending Approval', color: '#5e35b1' },
     { label: 'Done',               value: 'Done',            color: '#34a853' },
     { label: 'SLA Risk',           value: 'SLA Risk',        color: '#ff6d00' },
-    { label: 'Over SLA',           value: 'Over SLA',        color: '#ea4335' }
+    { label: 'Over SLA',           value: 'Over SLA',        color: '#ea4335' },
+    { label: '⏸ รอผู้ใช้',          value: 'รอผู้ใช้',          color: '#b26a00' },
+    { label: '📦 รอ vendor',        value: 'รอ vendor/อะไหล่',  color: '#6d4c41' }
   ];
 
   function updateStatusTabs(tickets) {
@@ -901,6 +972,8 @@
       <div class="detail-meta-item"><div class="detail-meta-label">ผู้แจ้ง</div><div class="detail-meta-value">${t.requester_name}</div></div>
       <div class="detail-meta-item"><div class="detail-meta-label">สร้างเมื่อ</div><div class="detail-meta-value">${formatDate(t.created_at)}</div></div>
       ${t.sla_deadline ? `<div class="detail-meta-item"><div class="detail-meta-label">SLA Deadline</div><div class="detail-meta-value" style="color:${new Date(t.sla_deadline)<new Date()?'var(--danger)':'var(--warning)'}">${formatDate(t.sla_deadline)}</div></div>` : ''}
+      ${t.sla_version === '2' && t.target_date ? `<div class="detail-meta-item"><div class="detail-meta-label">ผู้ใช้ต้องการ</div><div class="detail-meta-value">${t.target_date}${t.user_wants_sooner === 'TRUE' || t.user_wants_sooner === true ? ' ⚡' : ''}</div></div>` : ''}
+      ${t.agreed_due_date ? `<div class="detail-meta-item"><div class="detail-meta-label">กำหนดที่ตกลงกับผู้ใช้</div><div class="detail-meta-value" title="${t.agreed_due_reason || ''}">${formatDate(t.agreed_due_date)}</div></div>` : ''}
       ${t.assigned_name ? `<div class="detail-meta-item"><div class="detail-meta-label">ผู้รับผิดชอบ</div><div class="detail-meta-value">${t.assigned_name}</div></div>` : ''}
     `;
 
@@ -1041,6 +1114,23 @@
 
       const statusSel = document.getElementById('detail-status-select');
       statusSel.value = t.status;
+      // [Feat 2026-10-03] SLA v2 — ระหว่างหยุดนับ ห้ามเปลี่ยนสถานะจากช่องนี้ (ต้องกด ▶ เริ่มนับต่อ)
+      const _paused = (t.status === 'รอผู้ใช้' || t.status === 'รอ vendor/อะไหล่');
+      statusSel.disabled = _paused;
+      document.getElementById('detail-priority-select').value = t.priority;
+      document.getElementById('detail-priority-reason').value = '';
+      document.getElementById('detail-itwork-input').value = t.it_work_minutes || '';
+      renderSlaV2Section(t);
+      const slaMgrLabel = document.querySelector('#sla-deadline-manager-section .form-label');
+      const slaMgrHint  = document.querySelector('#sla-deadline-manager-section .text-muted');
+      if (t.sla_version === '2') {
+        slaMgrLabel.textContent = '📅 กำหนดที่ตกลงกับผู้ใช้ (ไม่มีผลกับ SLA)';
+        slaMgrHint.textContent  = 'ถ้าผู้ใช้เป็นคนขอเลื่อน ให้ใช้ ⏸ หยุดนับ: รอผู้ใช้ แทน';
+        document.getElementById('detail-sla-deadline-input').value = toDatetimeLocalValue(t.agreed_due_date);
+      } else {
+        slaMgrLabel.textContent = '⏰ แก้ไข SLA Deadline (IT_MANAGER)';
+        slaMgrHint.textContent  = 'ใช้เมื่อขยาย/ปรับกรอบเวลาให้ ticket เป็นกรณีพิเศษ — บันทึกลง Audit Log';
+      }
 
       const assignSel = document.getElementById('detail-assign-select');
       assignSel.innerHTML = '<option value="">— เลือก IT Staff —</option>' +
@@ -1134,6 +1224,122 @@
     }
   }
 
+  // ── [Feat 2026-10-03] SLA v2 รอบ 2 ─────────────────────────────
+  const PAUSE_TYPE_LABEL = { USER: '⏸ รอผู้ใช้', VENDOR: '📦 รอ vendor/อะไหล่' };
+  const REVIEW_LABEL = { PENDING: '⏳ รอ Manager ตรวจ', APPROVED: '✅ อนุมัติ', REJECTED: '❌ ไม่อนุมัติ (นับเวลาคืน)', AUTO: '✔ Manager หยุดเอง' };
+  function _isPaused(t) { return t.status === 'รอผู้ใช้' || t.status === 'รอ vendor/อะไหล่'; }
+  function setItWork(n) { document.getElementById('detail-itwork-input').value = n; }
+  function onPauseTypeChange() {
+    document.getElementById('pause-vendor-fields').style.display =
+      document.getElementById('pause-type-select').value === 'VENDOR' ? 'block' : 'none';
+  }
+  function togglePauseForm() {
+    const f = document.getElementById('sla-v2-pause-form');
+    f.style.display = f.style.display === 'none' ? 'block' : 'none';
+  }
+  function renderSlaV2Section(t) {
+    const sec = document.getElementById('sla-v2-section');
+    if (t.sla_version !== '2' || t.status === 'Done' || t.status === 'Pending Approval') {
+      sec.style.display = (t.sla_version === '2') ? 'block' : 'none';
+      document.getElementById('sla-v2-pause-form').style.display = 'none';
+      document.getElementById('sla-v2-resume-form').style.display = 'none';
+      document.getElementById('sla-v2-pause-toggle').style.display = 'none';
+    } else {
+      sec.style.display = 'block';
+      const paused = _isPaused(t);
+      document.getElementById('sla-v2-pause-form').style.display = 'none';
+      document.getElementById('sla-v2-resume-form').style.display = paused ? 'block' : 'none';
+      document.getElementById('sla-v2-pause-toggle').style.display = paused ? 'none' : 'block';
+      document.getElementById('pause-reason-input').value = '';
+      document.getElementById('pause-vendor-name').value = '';
+      document.getElementById('pause-vendor-eta').value = '';
+      document.getElementById('resume-note-input').value = '';
+      document.getElementById('pause-type-select').value = 'USER';
+      onPauseTypeChange();
+    }
+    if (t.sla_version !== '2') return;
+    const target = t.priority === 'Urgent' ? 4 : (t.priority === 'Normal' ? 16 : 0);
+    const used   = Math.round((parseFloat(t.sla_accumulated_hours) || 0) * 10) / 10;
+    const pausedH = Math.round((parseFloat(t.sla_paused_minutes) || 0) / 6) / 10;
+    document.getElementById('sla-v2-summary').innerHTML =
+      (target ? `เป้า <b>${target} ชม.</b> ทำการ` : 'Low — ไม่มี SLA') +
+      (_isPaused(t) ? ` · <b style="color:#b26a00">หยุดนับตั้งแต่ ${formatDate(t.pause_started_at)}</b>` : '') +
+      `<br>เวลาที่นับแล้ว (ถึงรอบล่าสุด) ${used} ชม. · หยุดนับรวม ${pausedH} ชม.` +
+      (t.first_response_at ? `<br>IT ตอบครั้งแรก ${formatDate(t.first_response_at)}` : '');
+    loadPauseLog(t.ticket_id);
+  }
+  async function loadPauseLog(ticketId) {
+    const el = document.getElementById('sla-v2-pause-log');
+    el.textContent = 'กำลังโหลด...';
+    const res = await API.get('ticket/pause-log', { id: ticketId });
+    const rows = res.success ? (res.data || []) : [];
+    if (!rows.length) { el.textContent = '—'; return; }
+    el.innerHTML = rows.slice().reverse().map(r => {
+      const mins = r.working_minutes !== '' && r.working_minutes != null ? ` · ${Math.round(r.working_minutes / 6) / 10} ชม.` : ' · ยังหยุดอยู่';
+      const vendor = r.pause_type === 'VENDOR' ? ` · ${r.vendor_name} (ETA ${formatDate(r.vendor_eta)})` : '';
+      const review = (r.review_status === 'PENDING' && isManager())
+        ? `<div style="margin-top:4px"><button class="btn btn-success btn-sm" onclick="reviewPauseItem('${r.pause_id}','APPROVE')">อนุมัติ</button> <button class="btn btn-danger btn-sm" onclick="reviewPauseItem('${r.pause_id}','REJECT')">ไม่อนุมัติ</button></div>`
+        : `<div>${REVIEW_LABEL[r.review_status] || r.review_status}</div>`;
+      return `<div style="padding:6px 0;border-bottom:1px dashed var(--border);color:var(--text)">
+        <b>${PAUSE_TYPE_LABEL[r.pause_type] || r.pause_type}</b> ${formatDate(r.paused_at)}${mins}${vendor}
+        <div>เหตุผล: ${r.reason}</div>${r.resume_note ? `<div>ได้รับ: ${r.resume_note}</div>` : ''}${review}</div>`;
+    }).join('');
+  }
+  async function doPauseTicket() {
+    const type   = document.getElementById('pause-type-select').value;
+    const reason = document.getElementById('pause-reason-input').value.trim();
+    const vName  = document.getElementById('pause-vendor-name').value.trim();
+    const vEta   = document.getElementById('pause-vendor-eta').value;
+    if (!reason) { showToast('กรุณาระบุเหตุผลที่หยุดนับ', 'warning'); return; }
+    if (type === 'VENDOR' && (!vName || !vEta)) { showToast('รอ vendor ต้องระบุชื่อผู้ขายและ ETA', 'warning'); return; }
+    showLoader('กำลังหยุดนับ...');
+    try {
+      const res = await API.post('ticket/pause', { ticket_id: currentTicket.ticket_id, pause_type: type, reason,
+        vendor_name: vName, vendor_eta: vEta ? vEta.replace('T', ' ') + ':00' : '' });
+      if (res.success) {
+        showToast(isManager() ? 'หยุดนับแล้ว' : 'หยุดนับแล้ว — รอ Manager ตรวจ', 'success');
+        await openTicketDetail(currentTicket.ticket_id); await loadTickets();
+      } else showToast(res.data?.error || 'เกิดข้อผิดพลาด', 'error');
+    } catch(e) { showToast('เกิดข้อผิดพลาด', 'error'); } finally { hideLoader(); }
+  }
+  async function doResumeTicket() {
+    const note = document.getElementById('resume-note-input').value.trim();
+    if (!note) { showToast('กรุณาสรุปสิ่งที่ได้รับ 1 บรรทัด', 'warning'); return; }
+    showLoader('กำลังเริ่มนับต่อ...');
+    try {
+      const res = await API.post('ticket/resume', { ticket_id: currentTicket.ticket_id, note });
+      if (res.success) { showToast('เริ่มนับต่อแล้ว · กำหนดเสร็จใหม่ ' + formatDate(res.data.sla_deadline), 'success');
+        await openTicketDetail(currentTicket.ticket_id); await loadTickets(); }
+      else showToast(res.data?.error || 'เกิดข้อผิดพลาด', 'error');
+    } catch(e) { showToast('เกิดข้อผิดพลาด', 'error'); } finally { hideLoader(); }
+  }
+  async function reviewPauseItem(pauseId, decision) {
+    let note = '';
+    if (decision === 'REJECT') {
+      note = prompt('เหตุผลที่ไม่อนุมัติการหยุดนับ (เวลาช่วงนั้นจะถูกนับคืน)');
+      if (!note || !note.trim()) { showToast('กรุณาระบุเหตุผล', 'warning'); return; }
+    }
+    showLoader('กำลังบันทึก...');
+    try {
+      const res = await API.post('ticket/pause-review', { pause_id: pauseId, decision, note });
+      if (res.success) { showToast(decision === 'APPROVE' ? 'อนุมัติการหยุดนับแล้ว' : 'ไม่อนุมัติ — นับเวลาคืนแล้ว', 'success');
+        await openTicketDetail(currentTicket.ticket_id); await loadTickets(); }
+      else showToast(res.data?.error || 'เกิดข้อผิดพลาด', 'error');
+    } catch(e) { showToast('เกิดข้อผิดพลาด', 'error'); } finally { hideLoader(); }
+  }
+  async function savePriorityChange() {
+    const pr = document.getElementById('detail-priority-select').value;
+    const reason = document.getElementById('detail-priority-reason').value.trim();
+    if (pr === currentTicket.priority) { showToast('ความเร่งด่วนเท่าเดิม', 'info'); return; }
+    if (!reason) { showToast('กรุณาระบุเหตุผลที่เปลี่ยนความเร่งด่วน', 'warning'); return; }
+    showLoader('กำลังบันทึก...');
+    try {
+      const res = await API.post('ticket/update', { ticket_id: currentTicket.ticket_id, priority: pr, priority_reason: reason });
+      if (res.success) { showToast('เปลี่ยนความเร่งด่วนแล้ว', 'success'); await openTicketDetail(currentTicket.ticket_id); await loadTickets(); }
+      else showToast(res.data?.error || 'เกิดข้อผิดพลาด', 'error');
+    } catch(e) { showToast('เกิดข้อผิดพลาด', 'error'); } finally { hideLoader(); }
+  }
+
   // [Feat] SLA Deadline override helpers — IT_MANAGER only
   function toDatetimeLocalValue(dt) {
     if (!dt) return '';
@@ -1154,7 +1360,13 @@
 
     showLoader('กำลังบันทึก SLA Deadline...');
     try {
-      const res = await API.post('ticket/update', { ticket_id: currentTicket.ticket_id, sla_deadline: formatted });
+      const payload = { ticket_id: currentTicket.ticket_id, sla_deadline: formatted };
+      if (currentTicket.sla_version === '2') {
+        const reason = prompt('เหตุผลของกำหนดที่ตกลงกับผู้ใช้ (จำเป็น)');
+        if (!reason || !reason.trim()) { showToast('กรุณาระบุเหตุผล', 'warning'); return; }
+        payload.agreed_due_reason = reason.trim();
+      }
+      const res = await API.post('ticket/update', payload);
       if (res.success) {
         showToast('บันทึก SLA Deadline ใหม่แล้ว', 'success');
         await openTicketDetail(currentTicket.ticket_id); // refetch + re-render
@@ -1310,7 +1522,9 @@
     showLoader('กำลังบันทึก...');
     try {
       const results = await Promise.all([
-        API.post('ticket/status', { ticket_id: currentTicket.ticket_id, status }),
+        (currentTicket.status === 'รอผู้ใช้' || currentTicket.status === 'รอ vendor/อะไหล่')
+          ? Promise.resolve({ success: true })
+          : API.post('ticket/status', { ticket_id: currentTicket.ticket_id, status }),
         assignee
           ? API.post('ticket/assign', { ticket_id: currentTicket.ticket_id, assignee_email: assignee })
           : Promise.resolve({ success: true }),
@@ -1326,7 +1540,8 @@
 
       showToast('บันทึกสำเร็จ', 'success');
       closeModal('ticket-detail-modal');
-      _applyLocalUpdate({ status, resolution, root_cause: rootcause });
+      const _p = (currentTicket.status === 'รอผู้ใช้' || currentTicket.status === 'รอ vendor/อะไหล่');
+      _applyLocalUpdate(_p ? { resolution, root_cause: rootcause } : { status, resolution, root_cause: rootcause });
     } catch(e) {
       showToast('เกิดข้อผิดพลาด', 'error');
     } finally { hideLoader(); }
@@ -1335,6 +1550,8 @@
   async function closeTicket() {
     const resolution = document.getElementById('detail-resolution-input').value;
     if (!resolution.trim()) { showToast('กรุณาระบุวิธีแก้ไขก่อนปิด Ticket', 'warning'); return; }
+    const itWork = parseInt(document.getElementById('detail-itwork-input').value, 10);
+    if (!(itWork > 0)) { showToast('กรุณากรอกเวลาทำงานจริง (นาที) ก่อนปิด Ticket', 'warning'); document.getElementById('detail-itwork-input').focus(); return; }
     // [Feat] IT_MANAGER closes directly; IT_STAFF only requests approval —
     // the backend decides which happens (closeTicketWithResolution routes by
     // role), we just show the right message for whichever it returns.
@@ -1343,7 +1560,8 @@
       const res = await API.post('ticket/close', {
         ticket_id:  currentTicket.ticket_id,
         resolution,
-        root_cause: document.getElementById('detail-rootcause-input').value
+        root_cause: document.getElementById('detail-rootcause-input').value,
+        it_work_minutes: itWork
       });
       if (res.success) {
         const finalStatus = res.data.status; // 'Done' (manager) or 'Pending Approval' (staff)

@@ -263,7 +263,10 @@
     'Done':               { bg: '#e6f4ea', color: 'var(--secondary)' },
     'Reopened':           { bg: '#f3e8fd', color: 'var(--purple)' },
     'SLA Risk':           { bg: '#fff3e0', color: 'var(--orange)' },
-    'Over SLA':           { bg: '#fce8e6', color: 'var(--danger)' }
+    'Over SLA':           { bg: '#fce8e6', color: 'var(--danger)' },
+    // [Feat 2026-10-03] SLA v2 — สถานะหยุดนับ
+    'รอผู้ใช้':             { bg: '#fff8e1', color: '#b26a00' },
+    'รอ vendor/อะไหล่':     { bg: '#efebe9', color: '#6d4c41' }
   };
   const DASH_PRIORITY_COLORS = {
     'Urgent': 'var(--danger)',
@@ -422,7 +425,8 @@
       'New Requests': summary.new, 'Working on it': summary.working,
       'Done': summary.done, 'Reopened': summary.reopened,
       'SLA Risk': summary.sla_risk, 'Over SLA': summary.over_sla,
-      'Pending Approval': summary.pending_approval
+      'Pending Approval': summary.pending_approval,
+      'รอผู้ใช้': summary.wait_user || 0, 'รอ vendor/อะไหล่': summary.wait_vendor || 0
     };
     const data = new google.visualization.DataTable();
     data.addColumn('string', 'สถานะ');
