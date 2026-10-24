@@ -236,7 +236,10 @@ const STATUS_COLORS = {
   'Done':              { bg: '#e6f4ea', text: '#34a853', badge: 'badge-success' },
   'Reopened':          { bg: '#f3e8fd', text: '#9c27b0', badge: 'badge-purple' },
   'SLA Risk':          { bg: '#fff3e0', text: '#ff9800', badge: 'badge-orange' },
-  'Over SLA':          { bg: '#fce8e6', text: '#ea4335', badge: 'badge-danger' }
+  'Over SLA':          { bg: '#fce8e6', text: '#ea4335', badge: 'badge-danger' },
+  // [Feat 2026-10-03] SLA v2 — สถานะหยุดนับ
+  'รอผู้ใช้':            { bg: '#fff8e1', text: '#b26a00', badge: 'badge-orange' },
+  'รอ vendor/อะไหล่':    { bg: '#efebe9', text: '#6d4c41', badge: 'badge-orange' }
 };
 
 const PRIORITY_COLORS = {
@@ -252,7 +255,9 @@ const STATUS_ICONS = {
   'Done':              '✅',
   'Reopened':          '🔁',
   'SLA Risk':          '⚠️',
-  'Over SLA':          '🚨'
+  'Over SLA':          '🚨',
+  'รอผู้ใช้':            '⏸',
+  'รอ vendor/อะไหล่':    '📦'
 };
 
 function statusBadge(status) {
