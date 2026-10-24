@@ -28,6 +28,25 @@
     .completion-drop-zone { border:2px dashed var(--border);border-radius:8px;padding:14px 10px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s; }
     .completion-drop-zone:hover { border-color:var(--primary);background:rgba(26,115,232,.04); }
     .completion-drop-zone.dragover { border-color:var(--primary);background:rgba(26,115,232,.08); }
+    /* [Fix 2026-10-24c] Night mode — กล่องสีอ่อน (inline) ตัวอักษรกลืนพื้น → พื้นเข้มโทนเดิม + ตัวอักษรสว่าง (โหมดสว่างไม่เปลี่ยน) */
+    [data-theme="dark"] #approve-close-section,
+    [data-theme="dark"] #pending-approval-readonly { background:#2a2340 !important; border-color:#5b4a8a !important; color:#d9cdfa !important; }
+    [data-theme="dark"] #approve-close-section .form-label { color:#c9b6ff !important; }
+    [data-theme="dark"] #reject-banner { background:#3a1f1d !important; border-color:#7a3b33 !important; color:#f6c1b8 !important; }
+    [data-theme="dark"] #reject-banner a { color:#f6c1b8 !important; }
+    [data-theme="dark"] #reject-history-list { border-top-color:#7a3b33 !important; }
+    [data-theme="dark"] #detail-resolution { background:#15301f !important; color:#a8e6bd !important; }
+    [data-theme="dark"] #sla-deadline-manager-section { background:#33240f !important; border-color:#7a5418 !important; }
+    [data-theme="dark"] #sla-deadline-manager-section .form-label { color:#ffb36b !important; }
+    [data-theme="dark"] #sla-v2-section { background:#2b2614 !important; border-color:#6b5a1f !important; }
+    [data-theme="dark"] #sla-v2-section .form-label { color:#f2c35e !important; }
+    [data-theme="dark"] #pause-review-banner { background:#332a10 !important; border-color:#7a6420 !important; color:#f3d27a !important; }
+    [data-theme="dark"] #pause-review-banner a { color:#ffd98a !important; }
+    [data-theme="dark"] #approve-close-section .text-muted,
+    [data-theme="dark"] #sla-deadline-manager-section .text-muted { color:#b9b3c9 !important; }
+    [data-theme="dark"] #delete-ticket-section > div[style*="#fce8e6"] { background:#3a1f1d !important; border-color:#7a3b33 !important; }
+    [data-theme="dark"] #delete-ticket-section .form-label { color:#ff9c94 !important; }
+    [data-theme="dark"] #delete-ticket-section .text-muted { color:#d9b3ae !important; }
   </style>
 </head>
 <body>
