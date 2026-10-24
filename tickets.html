@@ -972,7 +972,7 @@
       <div class="detail-meta-item"><div class="detail-meta-label">ผู้แจ้ง</div><div class="detail-meta-value">${t.requester_name}</div></div>
       <div class="detail-meta-item"><div class="detail-meta-label">สร้างเมื่อ</div><div class="detail-meta-value">${formatDate(t.created_at)}</div></div>
       ${t.sla_deadline ? `<div class="detail-meta-item"><div class="detail-meta-label">SLA Deadline</div><div class="detail-meta-value" style="color:${new Date(t.sla_deadline)<new Date()?'var(--danger)':'var(--warning)'}">${formatDate(t.sla_deadline)}</div></div>` : ''}
-      ${t.sla_version === '2' && t.target_date ? `<div class="detail-meta-item"><div class="detail-meta-label">ผู้ใช้ต้องการ</div><div class="detail-meta-value">${t.target_date}${t.user_wants_sooner === 'TRUE' || t.user_wants_sooner === true ? ' ⚡' : ''}</div></div>` : ''}
+      ${String(t.sla_version) === '2' && t.target_date ? `<div class="detail-meta-item"><div class="detail-meta-label">ผู้ใช้ต้องการ</div><div class="detail-meta-value">${t.target_date}${t.user_wants_sooner === 'TRUE' || t.user_wants_sooner === true ? ' ⚡' : ''}</div></div>` : ''}
       ${t.agreed_due_date ? `<div class="detail-meta-item"><div class="detail-meta-label">กำหนดที่ตกลงกับผู้ใช้</div><div class="detail-meta-value" title="${t.agreed_due_reason || ''}">${formatDate(t.agreed_due_date)}</div></div>` : ''}
       ${t.assigned_name ? `<div class="detail-meta-item"><div class="detail-meta-label">ผู้รับผิดชอบ</div><div class="detail-meta-value">${t.assigned_name}</div></div>` : ''}
     `;
@@ -1123,7 +1123,7 @@
       renderSlaV2Section(t);
       const slaMgrLabel = document.querySelector('#sla-deadline-manager-section .form-label');
       const slaMgrHint  = document.querySelector('#sla-deadline-manager-section .text-muted');
-      if (t.sla_version === '2') {
+      if (String(t.sla_version) === '2') {
         slaMgrLabel.textContent = '📅 กำหนดที่ตกลงกับผู้ใช้ (ไม่มีผลกับ SLA)';
         slaMgrHint.textContent  = 'ถ้าผู้ใช้เป็นคนขอเลื่อน ให้ใช้ ⏸ หยุดนับ: รอผู้ใช้ แทน';
         document.getElementById('detail-sla-deadline-input').value = toDatetimeLocalValue(t.agreed_due_date);
@@ -1237,10 +1237,11 @@
     const f = document.getElementById('sla-v2-pause-form');
     f.style.display = f.style.display === 'none' ? 'block' : 'none';
   }
+  // [Fix 2026-10-24] sla_version จากชีตเป็นตัวเลข → เทียบด้วย String() ทุกจุด (6 จุด)
   function renderSlaV2Section(t) {
     const sec = document.getElementById('sla-v2-section');
-    if (t.sla_version !== '2' || t.status === 'Done' || t.status === 'Pending Approval') {
-      sec.style.display = (t.sla_version === '2') ? 'block' : 'none';
+    if (String(t.sla_version) !== '2' || t.status === 'Done' || t.status === 'Pending Approval') {
+      sec.style.display = (String(t.sla_version) === '2') ? 'block' : 'none';
       document.getElementById('sla-v2-pause-form').style.display = 'none';
       document.getElementById('sla-v2-resume-form').style.display = 'none';
       document.getElementById('sla-v2-pause-toggle').style.display = 'none';
@@ -1257,7 +1258,7 @@
       document.getElementById('pause-type-select').value = 'USER';
       onPauseTypeChange();
     }
-    if (t.sla_version !== '2') return;
+    if (String(t.sla_version) !== '2') return;
     const target = t.priority === 'Urgent' ? 4 : (t.priority === 'Normal' ? 16 : 0);
     const used   = Math.round((parseFloat(t.sla_accumulated_hours) || 0) * 10) / 10;
     const pausedH = Math.round((parseFloat(t.sla_paused_minutes) || 0) / 6) / 10;
@@ -1361,7 +1362,7 @@
     showLoader('กำลังบันทึก SLA Deadline...');
     try {
       const payload = { ticket_id: currentTicket.ticket_id, sla_deadline: formatted };
-      if (currentTicket.sla_version === '2') {
+      if (String(currentTicket.sla_version) === '2') {
         const reason = prompt('เหตุผลของกำหนดที่ตกลงกับผู้ใช้ (จำเป็น)');
         if (!reason || !reason.trim()) { showToast('กรุณาระบุเหตุผล', 'warning'); return; }
         payload.agreed_due_reason = reason.trim();
