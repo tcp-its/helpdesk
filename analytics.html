@@ -516,6 +516,11 @@
     try {
       analyticsData = (aRes.data != null) ? aRes.data : {};
       allTickets    = (tRes.success === true && Array.isArray(tRes.data)) ? tRes.data : [];
+      // [Fix 2026-10-26] รอบ 3c — ตัด Ticket ทดสอบ (logtcp@) ออกจากกราฟ/ตาราง/Export ให้ตรงกับการ์ดจาก backend
+      //   ยกเว้นเปิด ?include_test=1 (backend ยอมรวมเฉพาะ IT_MANAGER)
+      if (new URLSearchParams(location.search).get('include_test') !== '1') {
+        allTickets = allTickets.filter(t => String((t && t.requester_email) || '').toLowerCase() !== 'logtcp@tcpharmachem.com');
+      }
 
       const filtered = allTickets.filter(t => {
         if (!t || !t.created_at) return true;
