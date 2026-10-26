@@ -1397,6 +1397,8 @@
     // (เดิมรอ 2 อย่างแรกเสร็จก่อนค่อยโหลดรายการงาน = รอ backend 2 รอบต่อกัน)
     const [, , res] = await Promise.all([loadWorklogUsers(), loadWorklogCategories(), API.get('worklog/list')]);
     allWorklog = res.success ? res.data : [];
+    // [Feat 2026-10-26] WL-0054 — "เปิด X วันทำการ" ต้องหักวันหยุดบริษัท: โหลดวันหยุดแล้ววาดตารางใหม่อีกรอบ
+    if (wlHolidaySet === null) loadWlHolidays().then(() => renderWorklog());
     buildWlPersonFilter();
     renderWorklog();
     drawWorklogCategoryChart();
