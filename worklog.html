@@ -46,7 +46,7 @@
     .wl-stat-card .wl-stat-value { font-size:22px; font-weight:800; line-height:1.2; }
     .wl-stat-card .wl-stat-label { font-size:11px; color:var(--text-muted); margin-top:2px; }
     /* ── [Redesign 2026-09-29] Dashboard v2 ─────────────────────────── */
-    .wl-kpis { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:12px; }
+    .wl-kpis { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:12px; } /* [Feat 2026-10-26] WL-0054 เพิ่มการ์ด 🔍 ควรคุย */
     .wl-kpi { margin:0 !important; padding:12px 14px !important; cursor:pointer; text-align:left; font:inherit; color:inherit; border:1px solid var(--border); width:100%; }
     .wl-kpi:hover { border-color:var(--primary); }
     .wl-kpi.on { outline:2px solid var(--primary); }
@@ -347,7 +347,7 @@
       </div>
       <div class="form-group" id="wl-status-group" style="display:none">
         <label class="form-label">สถานะ</label>
-        <select class="form-control" id="wl-status">
+        <select class="form-control" id="wl-status" onchange="_wlToggleDoneFields()">
           <option>📝 รอดำเนินการ</option>
           <option>🔄 กำลังทำ</option>
           <option>✅ เสร็จแล้ว</option>
@@ -357,6 +357,23 @@
       <div class="form-group" id="wl-resolution-group" style="display:none">
         <label class="form-label">ผลการดำเนินงาน</label>
         <textarea class="form-control" id="wl-resolution" rows="4" placeholder="สิ่งที่ทำไปแล้ว / ผลลัพธ์"></textarea>
+      </div>
+      <!-- [Feat 2026-10-26] WL-0054 — ปิดงาน: นาทีที่ทำจริง (บังคับ) + สาเหตุที่ค้างถ้าเปิดเกิน 1 วันทำการ -->
+      <div class="form-group" id="wl-done-group" style="display:none">
+        <label class="form-label">นาทีที่ทำจริง <span class="required">*</span></label>
+        <input type="number" class="form-control" id="wl-work-minutes" min="1" step="1" placeholder="รวมเวลาที่ลงมือทำจริง (นาที)">
+        <div class="d-flex gap-8 mt-8">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="wlQuickMinutes(5)">5</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="wlQuickMinutes(15)">15</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="wlQuickMinutes(30)">30</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="wlQuickMinutes(60)">60</button>
+        </div>
+        <div class="text-muted fs-11 mt-4" id="wl-open-info"></div>
+      </div>
+      <div class="form-group" id="wl-stuck-group" style="display:none">
+        <label class="form-label">ใบงานเปิดเกิน 1 วันทำการ — ติดเพราะอะไร <span class="required">*</span></label>
+        <select class="form-control" id="wl-stuck-reason"></select>
+        <input class="form-control mt-8" id="wl-stuck-note" placeholder="รายละเอียดเพิ่มเติม (บังคับถ้าเลือก อื่น ๆ)">
       </div>
       <div class="form-group">
         <label class="form-label">Ticket ที่เกี่ยวข้อง (ถ้ามี)</label>
@@ -815,6 +832,49 @@
   const WL_C = { good:'#0ca30c', warn:'#fab219', crit:'#d03b3b', s1:'#2a78d6', ov:'#eb6834' };
   const WL_W0 = 510, WL_L0 = 720, WL_L1 = 780, WL_W1 = 1050; // 08:30 / 12:00 / 13:00 / 17:30 (นาทีของวัน)
   const WL_DAY_MIN = 480; // 1 วันทำงาน = 8 ชม.
+  // [Feat 2026-10-26] WL-0054 — เวลาทำจริง vs เวลาที่ใบงานเปิด (ต้องตรงกับ CONFIG.WORKLOG_STUCK_REASONS ใน Config.js)
+  const WL_STUCK_REASONS = ['รอผู้ขาย/อะไหล่', 'รอข้อมูลจากผู้ใช้', 'งานอื่นแทรก', 'รออนุมัติ', 'อื่น ๆ'];
+  const WL_STUCK_OTHER = 'อื่น ๆ';
+  const WL_TALK_RATIO = 0.25;   // 🔍 ควรคุย: เปิดเกิน 1 วันทำการ และทำจริง < 25% ของเวลาทำการที่เปิด
+  function _wlFmtMin(m) {
+    if (m == null) return '—';
+    if (m < 60) return Math.round(m) + ' นาที';
+    if (m < WL_DAY_MIN) return (Math.round(m / 6) / 10) + ' ชม.';
+    return (Math.round(m / WL_DAY_MIN * 10) / 10) + ' วันทำการ';
+  }
+  function _wlOpenMin(w) {   // นาทีทำการที่ใบงานเปิด (ถึงเวลาเสร็จ หรือถึงตอนนี้)
+    const s = _wlDT(w.created_at); if (!s) return null;
+    const e = w.status === WL_DONE ? (_wlDT(w.done_at) || new Date()) : new Date();
+    return _wlWorkMinutes(s, e);
+  }
+  function _wlWorkMin(w) { const n = Number(w.work_minutes); return n > 0 ? n : null; }
+  function _wlTalk(w) {
+    if (w.status !== WL_DONE) return false;
+    const o = _wlOpenMin(w), m = _wlWorkMin(w);
+    return o != null && m != null && o > WL_DAY_MIN && m < o * WL_TALK_RATIO;
+  }
+  function _wlTimeLine(w) {   // "เปิด 3 วันทำการ · ทำจริง 30 นาที"
+    const o = _wlOpenMin(w), m = _wlWorkMin(w);
+    if (w.status !== WL_DONE) return o != null ? 'เปิดมาแล้ว ' + _wlFmtMin(o) : '';
+    if (m == null) return '';
+    return 'เปิด ' + _wlFmtMin(o) + ' · ทำจริง ' + _wlFmtMin(m);
+  }
+  function wlQuickMinutes(n) { document.getElementById('wl-work-minutes').value = n; }
+  function _wlToggleDoneFields() {
+    const isDone = document.getElementById('wl-status').value === WL_DONE;
+    const logId  = document.getElementById('wl-log-id').value;
+    const item   = logId ? allWorklog.find(w => w.log_id === logId) : null;
+    const show   = !!item && isDone;
+    document.getElementById('wl-done-group').style.display = show ? '' : 'none';
+    let openMin = null;
+    if (show) {
+      const s = _wlDT(item.created_at);
+      const e = item.status === WL_DONE ? (_wlDT(item.done_at) || new Date()) : new Date();
+      openMin = s ? _wlWorkMinutes(s, e) : null;
+      document.getElementById('wl-open-info').textContent = openMin != null ? 'ใบงานนี้เปิดมาแล้ว ' + _wlFmtMin(openMin) + ' (เวลาทำการ)' : '';
+    }
+    document.getElementById('wl-stuck-group').style.display = show && openMin != null && openMin > WL_DAY_MIN ? '' : 'none';
+  }
   const WL_TH_DOW = ['อา','จ','อ','พ','พฤ','ศ','ส'];
   let wlHolidaySet = null, wlHolidayOk = false, _wlHolidayLoading = null;
   let _wlDrillKey = null;
@@ -900,7 +960,17 @@
       card('late', S.late.length,  ' งาน', '🔴 เลยกำหนด', WL_C.crit) +
       card('dur',  _wlFmtDays(med), med == null ? '' : ' วันทำงาน', '⏱️ เวลาปิดงาน (ค่ากลาง)', 'inherit',
            (avg == null ? 'ยังไม่มีงานที่เสร็จในช่วงนี้' : 'เฉลี่ย ' + _wlFmtDays(avg) + ' วัน · n=' + S.days.length + ' งาน') +
-           (S.retro ? '<br>ไม่นับ ' + S.retro + ' งานที่บันทึกย้อนหลัง' : ''));
+           (S.retro ? '<br>ไม่นับ ' + S.retro + ' งานที่บันทึกย้อนหลัง' : '')) +
+      // [Feat 2026-10-26] WL-0054 — 🔍 ควรคุย + เวลาทำจริงรวม + สาเหตุที่ค้างบ่อยสุด
+      (() => {
+        const talk = S.done.filter(_wlTalk), mins = S.done.map(_wlWorkMin).filter(v => v != null);
+        const tot = mins.reduce((a, b) => a + b, 0), rc = {};
+        S.done.forEach(w => { if (w.stuck_reason) rc[w.stuck_reason] = (rc[w.stuck_reason] || 0) + 1; });
+        const top = Object.keys(rc).sort((a, b) => rc[b] - rc[a])[0];
+        return card('talk', talk.length, ' งาน', '🔍 ควรคุย (เปิดนาน ทำจริงน้อย)', talk.length ? '#e65100' : 'inherit',
+          (mins.length ? 'ทำจริงรวม ' + _wlFmtMin(tot) + ' · ' + mins.length + ' งานที่กรอก' : 'ยังไม่มีงานที่กรอกเวลาทำจริง') +
+          (top ? '<br>ติดบ่อยสุด: ' + _wlEscapeHtml(top) + ' (' + rc[top] + ')' : ''));
+      })();
   }
 
   // ── รายการงานเมื่อคลิกการ์ด / แถวกราฟ / ช่องวัน ──
@@ -910,6 +980,7 @@
     if (key === 'done') return ['✅ เสร็จในช่วงนี้', S.done];
     if (key === 'open') return ['⏳ ยังค้าง (ณ สิ้นช่วง)', S.open];
     if (key === 'late') return ['🔴 เลยกำหนด', S.late];
+    if (key === 'talk') return ['🔍 ควรคุย — เปิดเกิน 1 วันทำการ แต่ทำจริงไม่ถึง 25%', S.done.filter(_wlTalk)];   // [Feat 2026-10-26] WL-0054
     if (key === 'dur')  return ['⏱️ งานที่เสร็จในช่วงนี้ — เรียงจากใช้เวลานานสุด', S.done.slice().sort((a,b) => (_wlCloseDays(b)||0) - (_wlCloseDays(a)||0))];
     const i = key.indexOf(':'), type = key.slice(0, i), val = key.slice(i + 1);
     if (type === 'p') return ['👤 ' + val + ' — งานในช่วงนี้', S.items.filter(w => _wlPerson(w) === val)];
@@ -949,7 +1020,7 @@
           : (_wlIsLateNow(w) ? '<span style="color:' + WL_C.crit + '">🔴 เลยกำหนด ' : '<span>⏳ ส่ง ') + fmtWLDueDate(_wlToBkkStr(w.due_date)) + '</span>';
         return `<tr>
           <td class="fs-12 text-muted" style="white-space:nowrap">${_wlEscapeHtml(w.log_no || '')}</td>
-          <td>${_wlEscapeHtml(w.title)}</td>
+          <td>${_wlEscapeHtml(w.title)}${_wlTimeLine(w) ? `<div class="text-muted fs-11">${_wlTimeLine(w)}${w.stuck_reason ? ' · ติด: ' + _wlEscapeHtml(w.stuck_reason) + (w.stuck_note ? ' (' + _wlEscapeHtml(w.stuck_note) + ')' : '') : ''}</div>` : ''}</td>
           <td class="fs-12">${_wlEscapeHtml(_wlPerson(w))}</td>
           <td class="fs-12">${_wlEscapeHtml(w.category || '')}</td>
           <td class="fs-12" style="white-space:nowrap">${st}</td>
@@ -1018,7 +1089,7 @@
       ? (today ? '🕘 วันนี้ ใครทำงานอะไร ช่วงเวลาไหน' : '🕘 วันที่ ' + fmtWLDueDate(_wlYmd(wlPeriod.start)) + ' ใครทำงานอะไร ช่วงเวลาไหน')
       : '📅 ใครทำงานอะไร วันไหน (เฉพาะวันในช่วงที่เลือก)';
     document.getElementById('wl-tl-sub').innerHTML = oneDay
-      ? 'เวลาทำงาน 08:30–17:30 (แถบเทา = พักเที่ยง) · <b style="color:' + WL_C.s1 + '">แท่งน้ำเงิน</b> = งานที่เสร็จวันนี้ (เวลาเริ่ม→เสร็จ) · <b style="color:' + WL_C.ov + '">แท่งส้ม</b> = ช่วงที่ทำซ้อนกัน · <b style="color:#7fa9e6">แท่งสีจาง ◀</b> = เริ่มก่อนวันนี้ (ไม่รู้เวลาทำจริง ไม่นับว่าซ้อน) · เส้นประ = งานในมือ (ยังไม่มีเวลาทำจริง — ปุ่ม ▶️/⏸️ จะมาในขั้นที่ 2)'
+      ? 'เวลาทำงาน 08:30–17:30 (แถบเทา = พักเที่ยง) · <b style="color:' + WL_C.s1 + '">แท่งน้ำเงิน</b> = งานที่เสร็จวันนี้ (เวลาเริ่ม→เสร็จ) · <b style="color:' + WL_C.ov + '">แท่งส้ม</b> = ช่วงที่ทำซ้อนกัน · <b style="color:#7fa9e6">แท่งสีจาง ◀</b> = เริ่มก่อนวันนี้ (ไม่รู้เวลาทำจริง ไม่นับว่าซ้อน) · เส้นประ = งานในมือ (ช่วงเวลาทำจริงไม่ถูกบันทึก — ดู "เวลาทำจริง" ที่กรอกตอนปิดงานแทน)'
       : 'แท่งน้ำเงิน = งานที่เสร็จในวันนั้น · เส้นประ = งานในมือวันนี้ · คลิกงานเพื่อเปิดดู';
     if (oneDay) _wlDrawDay(el, wlPeriod.start); else _wlDrawRange(el);
   }
@@ -1358,7 +1429,7 @@
         <td class="fs-12">${(wlUsers.find(u=>u.email===w.assigned_to)||{}).display_name || w.assigned_to || '—'}</td>
         <td><span class="badge" style="background:${bg};color:${fg}">${color?color+' ':''}${fmtWLDueDate(w.due_date)}</span></td>
         <td>${w.reschedule_count ? `<span class="badge" style="background:#fff3e0;color:#e65100">${w.reschedule_count} ครั้ง</span>` : '<span class="text-muted fs-12">—</span>'}</td>
-        <td class="fs-12" style="white-space:nowrap">${w.status||'—'}</td>
+        <td class="fs-12" style="white-space:nowrap">${w.status||'—'}${_wlTalk(w) ? ' <span class="badge" style="background:#fff3e0;color:#e65100" title="เปิดนานแต่ทำจริงน้อย — ควรคุยกับทีมว่าติดอะไร">🔍 ควรคุย</span>' : ''}${_wlTimeLine(w) ? `<div class="text-muted fs-11">${_wlTimeLine(w)}${w.stuck_reason ? ' · ' + _wlEscapeHtml(w.stuck_reason) : ''}</div>` : ''}</td>
         <td>
           <div class="d-flex gap-8">
             <button class="btn-icon" title="แก้ไข" onclick="openWorklogModal('${w.log_id}')">✏️</button>
@@ -1509,6 +1580,13 @@
     if (item) document.getElementById('wl-status').value = item.status;
     document.getElementById('wl-resolution-group').style.display = item ? '' : 'none';
     document.getElementById('wl-resolution').value = item ? (item.resolution_note || '') : '';
+    // [Feat 2026-10-26] WL-0054
+    document.getElementById('wl-work-minutes').value = item && Number(item.work_minutes) > 0 ? Number(item.work_minutes) : '';
+    document.getElementById('wl-stuck-reason').innerHTML = '<option value="">— เลือกสาเหตุ —</option>' +
+      WL_STUCK_REASONS.map(r => `<option${item && item.stuck_reason === r ? ' selected' : ''}>${r}</option>`).join('');
+    document.getElementById('wl-stuck-note').value = item ? (item.stuck_note || '') : '';
+    _wlToggleDoneFields();
+    loadWlHolidays().then(_wlToggleDoneFields);
 
     // [Feat 2026-09-24] ข้อ 3 (backlog รอบ 2): เวลาเริ่มงาน — แก้ไขได้เฉพาะ
     // IT_MANAGER และเฉพาะตอนแก้ไขงานที่มีอยู่แล้ว (งานใหม่ตั้งอัตโนมัติเสมอ)
@@ -1555,6 +1633,18 @@
           resolution_note: document.getElementById('wl-resolution').value,
           linked_ticket_id: document.getElementById('wl-linked-ticket').value
         };
+        // [Feat 2026-10-26] WL-0054 — ปิดงานต้องมีนาทีที่ทำจริง (+ สาเหตุถ้าเปิดเกิน 1 วันทำการ)
+        if (updatePayload.status === WL_DONE) {
+          const wm = parseInt(document.getElementById('wl-work-minutes').value, 10);
+          if (!(wm > 0)) { showToast('กรุณากรอกนาทีที่ทำจริง','warning'); hideLoader(); return; }
+          updatePayload.work_minutes = wm;
+          if (document.getElementById('wl-stuck-group').style.display !== 'none') {
+            const rs = document.getElementById('wl-stuck-reason').value, nt = document.getElementById('wl-stuck-note').value.trim();
+            if (!rs) { showToast('กรุณาเลือกสาเหตุที่ใบงานค้าง','warning'); hideLoader(); return; }
+            if (rs === WL_STUCK_OTHER && !nt) { showToast('เลือก "อื่น ๆ" แล้ว กรุณาพิมพ์รายละเอียด','warning'); hideLoader(); return; }
+            updatePayload.stuck_reason = rs; updatePayload.stuck_note = nt;
+          }
+        }
         // ข้อ 3 (backlog รอบ 2): ส่ง created_at ก็ต่อเมื่อเป็น IT_MANAGER และช่อง
         // แก้ไขกำลังแสดงอยู่จริง (พนักงานเห็นแค่ readonly ไม่มีช่องนี้ให้กรอก)
         if (isManager() && document.getElementById('wl-created-at-group').style.display !== 'none') {
