@@ -510,7 +510,7 @@
             <button class="btn btn-warning btn-block" onclick="resendSurvey()" id="resend-survey-btn">
               📨 ส่ง Survey ซ้ำ
             </button>
-            <div class="text-muted fs-11 mt-4" style="text-align:center">ส่งได้อีก 1 ครั้ง — user ยังไม่ให้คะแนน</div>
+            <div class="text-muted fs-11 mt-4" style="text-align:center">ส่งทางอีเมล (+ LINE ถ้ามี) ได้อีก 1 ครั้ง — user ยังไม่ให้คะแนน</div>
           </div>
 
           <!-- [Feat] อัปโหลดรูปยืนยันงาน (IT Staff only) -->
@@ -1224,7 +1224,9 @@
       // [Survey Reminder] แสดงปุ่ม Resend Survey เมื่อ Done + ยังไม่มีคะแนน + ยังส่งซ้ำได้
       const resendSection = document.getElementById('resend-survey-section');
       const resendCount   = parseInt(t.survey_resend_count || 0);
-      if (t.status === 'Done' && !(t.satisfaction_score > 0) && resendCount < 1 && t.requester_line_id) {
+      // [Fix 2026-10-26] รอบ 3b — ส่งทางอีเมลได้ ไม่บังคับต้องมี LINE (อีเมลจริง หรือ LINE อย่างใดอย่างหนึ่ง)
+      const _hasRealEmail = !!t.requester_email && String(t.requester_email).indexOf('@') > 0 && String(t.requester_email).indexOf('line_') !== 0;
+      if (t.status === 'Done' && !(t.satisfaction_score > 0) && resendCount < 1 && (_hasRealEmail || t.requester_line_id)) {
         resendSection.style.display = 'block';
       } else {
         resendSection.style.display = 'none';
@@ -1697,7 +1699,7 @@
   // ── Resend Survey (IT Staff) ─────────────────────────────────
   // [Survey Reminder] IT Staff กดส่ง survey ซ้ำ 1 ครั้ง
   async function resendSurvey() {
-    if (!confirm('ส่ง Survey ให้ผู้แจ้งอีกครั้งหรือไม่?\n(สามารถทำได้เพียง 1 ครั้งเท่านั้น)')) return;
+    if (!confirm('ส่ง Survey ให้ผู้แจ้งอีกครั้งหรือไม่?\n(ส่งทางอีเมล + LINE ถ้ามี · ทำได้เพียง 1 ครั้งเท่านั้น)')) return;
     const btn = document.getElementById('resend-survey-btn');
     btn.disabled    = true;
     btn.textContent = '⏳ กำลังส่ง...';

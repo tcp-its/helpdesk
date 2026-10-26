@@ -183,6 +183,12 @@
       <div id="section-sla" class="section">
         <div class="kpi-row" id="sla-kpis"></div>
 
+        <!-- [Feat 2026-10-26] รอบ 3b — ตัวชี้วัด SLA กติกาใหม่ (v2) -->
+        <div class="report-card" id="sla-v2-card" style="margin-bottom:20px">
+          <h4>⏱️ SLA กติกาใหม่ (v2) <span id="sla-v2-note" style="font-weight:400;font-size:12px;color:var(--text-muted)"></span></h4>
+          <div id="sla-v2-body"></div>
+        </div>
+
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
           <div class="report-card">
             <h4>📊 SLA Performance รายเดือน</h4>
@@ -471,6 +477,8 @@
     const analyticsParams = {};
     if (df instanceof Date && !isNaN(df.getTime())) analyticsParams.date_from = isoLocalDate(df);
     if (dt instanceof Date && !isNaN(dt.getTime())) analyticsParams.date_to   = isoLocalDate(dt);
+    // [Feat 2026-10-26] รอบ 3b — ?include_test=1 (IT_MANAGER) รวม Ticket ทดสอบในตัวชี้วัด v2
+    if (new URLSearchParams(location.search).get('include_test') === '1') analyticsParams.include_test = '1';
 
     // ── STAGE 1: Fetch APIs (allSettled = ไม่มีทาง throw) ───────
     let aRes = { success: false }, tRes = { success: false }, kbRes = { success: false };
@@ -523,6 +531,7 @@
       // ── STAGE 4: Render ────────────────────────────────────────
       try { renderOverview(filtered, analyticsData); }             catch(e) { console.error('[renderOverview]',         e); }
       try { renderSLASection(filtered); }                          catch(e) { console.error('[renderSLASection]',       e); }
+      try { renderSLAv2Section(analyticsData.sla_v2); }            catch(e) { console.error('[renderSLAv2Section]',     e); }
       try { renderTeamSection(filtered); }                         catch(e) { console.error('[renderTeamSection]',      e); }
       try { renderRejectSection(analyticsData); }                   catch(e) { console.error('[renderRejectSection]',    e); }
       try { renderAISection(analyticsData, kbData); }              catch(e) { console.error('[renderAISection]',        e); }
@@ -666,6 +675,46 @@
   }
 
   // ── SLA SECTION ──────────────────────────────────────────────
+  // [Feat 2026-10-26] รอบ 3b — ตัวชี้วัด SLA v2 (ค่ากลาง = มัธยฐาน, หน่วยนาทีทำการ)
+  function renderSLAv2Section(m) {
+    const body = document.getElementById('sla-v2-body');
+    const note = document.getElementById('sla-v2-note');
+    if (!body) return;
+    if (!m) { body.innerHTML = '<div class="kpi-mini-lbl">โหลดตัวชี้วัด v2 ไม่สำเร็จ</div>'; return; }
+    const esc = v => String(v).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const dur = min => {
+      if (min === null || min === undefined) return '—';
+      if (min < 60) return Math.round(min) + ' นาที';
+      return (Math.round(min / 6) / 10) + ' ชม.';
+    };
+    const pct = r => (r && r.rate_pct !== null && r.rate_pct !== undefined) ? r.rate_pct + '%' : '—';
+    const frac = r => (r && (r.met + r.breached) > 0) ? `${r.met} / ${r.met + r.breached} ใบ` : 'ยังไม่มี Ticket ปิด';
+    if (note) note.textContent = '· เริ่มใช้ ' + esc(m.start_date || '') + (m.include_test ? ' · รวม Ticket ทดสอบ' : '');
+    const pu = m.pause.user, pv = m.pause.vendor;
+    const pauseMax = Math.max(pu.minutes, pv.minutes, 1);
+    const kpis = [
+      { label:'SLA v2 ผ่าน', val: pct(m.v2), hint: frac(m.v2) + ' · v1 ' + pct(m.v1), color:'#34a853' },
+      { label:'ตอบครั้งแรก (มัธยฐาน)', val: dur(m.first_response.median_min), hint: 'Urgent ' + dur(m.first_response.urgent_median_min) + ' · Normal ' + dur(m.first_response.normal_median_min), color:'#1a73e8' },
+      { label:'ผู้ใช้รอรวม (มัธยฐาน)', val: dur(m.total_wait.median_min), hint: 'รวมช่วงหยุดนับ · ' + m.total_wait.n + ' ใบ', color:'#1a73e8' },
+      { label:'หยุดนับ', val: (pu.count + pv.count) + ' ครั้ง', hint: 'รอผู้ใช้ ' + pu.count + ' · รอ vendor ' + pv.count, color:'#ff9800' },
+      { label:'IT ลงมือจริง (ทุก Ticket)', val: dur(m.it_work.total_min), hint: m.it_work.tickets + ' ใบ · เฉลี่ย ' + dur(m.it_work.avg_min) + '/ใบ · เป้า ≤ 35 ชม./เดือน', color:'#1a73e8' },
+      { label:'เปลี่ยนความเร่งด่วน', val: m.priority_change.tickets + ' ใบ', hint: 'รวม ' + m.priority_change.total + ' ครั้ง', color:'#9c27b0' },
+    ];
+    const bar = (label, p) => `
+      <div style="display:grid;grid-template-columns:90px 1fr 110px;gap:8px;align-items:center;font-size:12px;margin-top:6px">
+        <span>${label}</span>
+        <div style="height:10px;border-radius:5px;background:var(--border);overflow:hidden"><i style="display:block;height:100%;width:${Math.round(p.minutes / pauseMax * 100)}%;background:#ff9800"></i></div>
+        <span style="text-align:right">${dur(p.minutes)}${p.open ? ' · ค้าง ' + p.open : ''}</span>
+      </div>`;
+    body.innerHTML = `
+      <div class="kpi-row" style="margin-bottom:12px">
+        ${kpis.map(k => `<div class="kpi-mini"><div class="kpi-mini-val" style="color:${k.color}">${esc(k.val)}</div><div class="kpi-mini-lbl">${esc(k.label)}</div><div class="kpi-mini-lbl">${esc(k.hint)}</div></div>`).join('')}
+      </div>
+      <div class="kpi-mini-lbl">เวลาหยุดนับ แยกตามประเภท (นาทีทำการ, ไม่นับรายการที่ Manager ไม่อนุมัติ)</div>
+      ${bar('รอผู้ใช้', pu)}${bar('รอ vendor', pv)}
+      <div class="kpi-mini-lbl" style="margin-top:8px">SLA v2 แยกความเร่งด่วน: Urgent ${pct(m.v2_urgent)} (${frac(m.v2_urgent)}) · Normal ${pct(m.v2_normal)} (${frac(m.v2_normal)})</div>`;
+  }
+
   function renderSLASection(tickets) {
     const slaData = analyticsData.sla || {};
     document.getElementById('sla-kpis').innerHTML = [
