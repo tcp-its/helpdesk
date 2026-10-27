@@ -329,7 +329,7 @@
            ระยะเวลาทำงานจริงใน Dashboard (Timeline + ระยะเวลาเฉลี่ยต่อหมวดหมู่) -->
       <div class="form-group" id="wl-created-at-group" style="display:none">
         <label class="form-label">เวลาเริ่มงาน</label>
-        <input type="text" class="form-control" id="wl-created-at" placeholder="เลือกวันและเวลา">
+        <input type="text" class="form-control" id="wl-created-at" placeholder="เลือกวันและเวลา" onchange="_wlToggleDoneFields()">
         <div class="text-muted fs-11 mt-8">แก้ไขได้เฉพาะหัวหน้าแผนก (IT_MANAGER) — ใช้คำนวณระยะเวลาทำงานจริงใน Dashboard</div>
       </div>
       <div class="form-group" id="wl-created-at-readonly-group" style="display:none">
@@ -561,7 +561,7 @@
     };
     _fpDue     = flatpickr('#wl-due-date', fpOpts);
     _fpResched = flatpickr('#wl-resched-new-date', fpOpts);
-    _fpCreated = flatpickr('#wl-created-at', fpOpts);
+    _fpCreated = flatpickr('#wl-created-at', Object.assign({}, fpOpts, { onChange: function(){ _wlToggleDoneFields(); } }));   // [Fix 2026-10-27] WL-0101
   } catch (fpErr) {
     console.warn('[Flatpickr] init failed, falling back to plain text input:', fpErr);
     _fpDue = null; _fpResched = null; _fpCreated = null;
@@ -868,7 +868,14 @@
     document.getElementById('wl-done-group').style.display = show ? '' : 'none';
     let openMin = null;
     if (show) {
-      const s = _wlDT(item.created_at);
+      // [Fix 2026-10-27] WL-0101: ใช้เวลาเริ่มที่กำลังแก้ในช่อง (IT_MANAGER) ไม่ใช่ค่าที่บันทึกไว้
+      let s = _wlDT(item.created_at);
+      const cg = document.getElementById('wl-created-at-group');
+      if (cg && cg.style.display !== 'none') {
+        const typed = parseWLDueDate(document.getElementById('wl-created-at').value);
+        const ts = typed ? _wlDT(typed) : null;
+        if (ts) s = ts;
+      }
       const e = item.status === WL_DONE ? (_wlDT(item.done_at) || new Date()) : new Date();
       openMin = s ? _wlWorkMinutes(s, e) : null;
       document.getElementById('wl-open-info').textContent = openMin != null ? 'ใบงานนี้เปิดมาแล้ว ' + _wlFmtMin(openMin) + ' (เวลาทำการ)' : '';
@@ -1587,8 +1594,6 @@
     document.getElementById('wl-stuck-reason').innerHTML = '<option value="">— เลือกสาเหตุ —</option>' +
       WL_STUCK_REASONS.map(r => `<option${item && item.stuck_reason === r ? ' selected' : ''}>${r}</option>`).join('');
     document.getElementById('wl-stuck-note').value = item ? (item.stuck_note || '') : '';
-    _wlToggleDoneFields();
-    loadWlHolidays().then(_wlToggleDoneFields);
 
     // [Feat 2026-09-24] ข้อ 3 (backlog รอบ 2): เวลาเริ่มงาน — แก้ไขได้เฉพาะ
     // IT_MANAGER และเฉพาะตอนแก้ไขงานที่มีอยู่แล้ว (งานใหม่ตั้งอัตโนมัติเสมอ)
@@ -1609,6 +1614,10 @@
       createdEditGroup.style.display = 'none';
       createdRoGroup.style.display   = 'none';
     }
+
+    // [Fix 2026-10-27] WL-0101: คำนวณช่องปิดงานหลังตั้งค่าเวลาเริ่มแล้ว (เดิมเรียกก่อน จึงใช้ค่าของใบก่อนหน้า)
+    _wlToggleDoneFields();
+    loadWlHolidays().then(_wlToggleDoneFields);
 
     document.getElementById('wl-attachment-input').value = '';
     renderWlAttachmentList(item);
